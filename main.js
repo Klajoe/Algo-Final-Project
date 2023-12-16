@@ -1,3 +1,5 @@
+const TIME_SLOTS = ['9:00-10:00', '10:00-11:00', '11:00-12:00', '12:00-13:00', '13:00-14:00', '14:00-15:00', '15:00-16:00', '16:00-17:00', '17:00-18:00'];
+
 class Classroom {
     constructor(roomID, classroomCapacities) {
         this.roomID = roomID;
@@ -14,87 +16,64 @@ class ClassList {
     }
 }
 
-// Function to read file
 function readFile(path, callback) {
     const fs = require("fs");
 
     fs.readFile(path, "utf8", (err, data) => {
         if (err) {
-            console.error("File is not found !!!", err);
+            console.error("File not found or could not be read:", err);
             return;
         }
 
         const lines = data.split("\n");
-        const output = [];
+        const output = lines.map(line => line.split(","));
 
-        lines.forEach((line) => {
-            const fields = line.split(",");
-            output.push(fields);
-        });
-
-        callback(output); // Invoke the callback with the output array
+        callback(output);
     });
 }
+
 function isSlotAvailable(schedule, classInfo, slot, classroomCapacities) {
-    // Check professor and student conflicts
-    for (let key in schedule) {
+    for (const key in schedule) {
         if (schedule[key].time === slot && (schedule[key].professor === classInfo.professorName || schedule[key].student === classInfo.studentID)) {
-            return false; // Conflict found
+            return false;
         }
     }
 
-    // Check classroom capacity constraint
-    let matchingRoom = classroomCapacities.find(room => room.roomID === classInfo.courseID);
+    const matchingRoom = classroomCapacities.find(room => room.roomID === classInfo.courseID);
 
     if (matchingRoom && matchingRoom.classroomCapacities / 2 < classInfo.examDuration) {
-        return false; // Classroom capacity constraint not met
+        return false;
     }
 
-    return true; // Slot is available
+    return true;
 }
 
-
-
-// Backtracking scheduler function
-function scheduleExams(classList, examSlots, classroomCapacities) {
-    let schedule = {};
-    if (findSchedule(classList, 0, schedule, examSlots, classroomCapacities)) {
-        return schedule;
-    } else {
-        return "No feasible schedule found";
-    }
-}
-
-// Recursive function for finding a feasible schedule
 function findSchedule(classList, index, schedule, examSlots, classroomCapacities) {
     if (index === classList.length) {
         return true;
     }
 
-    for (let slot of examSlots) {
+    for (const slot of examSlots) {
         if (isSlotAvailable(schedule, classList[index], slot, classroomCapacities)) {
             const courseId = classList[index].courseID;
+            const { professorName, studentID } = classList[index];
 
-            // Check if the courseID is already in the schedule
             if (!schedule[courseId]) {
                 schedule[courseId] = {
                     time: slot,
-                    professor: classList[index].professorName,
-                    students: [classList[index].studentID] // Start with an array for students
+                    professor: professorName,
+                    students: [studentID]
                 };
             } else {
-                // If the courseID is already in the schedule, add the student ID
-                schedule[courseId].students.push(classList[index].studentID);
+                schedule[courseId].students.push(studentID);
             }
 
             if (findSchedule(classList, index + 1, schedule, examSlots, classroomCapacities)) {
                 return true;
             }
 
-            // If scheduling with the current slot is unsuccessful, remove the student ID
             schedule[courseId].students.pop();
 
-            // If no more students for the course, remove the course from the schedule
             if (schedule[courseId].students.length === 0) {
                 delete schedule[courseId];
             }
@@ -104,9 +83,15 @@ function findSchedule(classList, index, schedule, examSlots, classroomCapacities
     return false;
 }
 
+function scheduleExams(classList, examSlots, classroomCapacities) {
+    let schedule = {};
+    if (findSchedule(classList, 0, schedule, examSlots, classroomCapacities)) {
+        return schedule;
+    } else {
+        return "No feasible schedule found";
+    }
+}
 
-
-// Main function to execute the scheduling
 function main() {
     readFile("Class_List.csv", function (classListData) {
         const classList = classListData.map(fields => new ClassList(Number(fields[0]), fields[1], fields[2], Number(fields[3])));
@@ -114,11 +99,9 @@ function main() {
         readFile("Classroom_Capacities.csv", function (classroomCapacitiesData) {
             const classroomCapacities = classroomCapacitiesData.map(fields => new Classroom(fields[0], Number(fields[1])));
 
-            let examSlots = ['9:00-10:00', '10:00-11:00', '11:00-12:00', '12:00-13:00', '13:00-14:00', '14:00-15:00', '15:00-16:00', '16:00-17:00', '17:00-18:00'];
-            let examSchedule = scheduleExams(classList, examSlots, classroomCapacities);
+            let examSchedule = scheduleExams(classList, TIME_SLOTS, classroomCapacities);
             console.log("Exam Schedule:", examSchedule);
         });
-
     });
 }
 
