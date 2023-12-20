@@ -1,3 +1,5 @@
+const fs = require("fs");
+
 const TIME_SLOTS = ['9:00-10:00', '10:00-11:00', '11:00-12:00', '12:00-13:00', '13:00-14:00', '14:00-15:00', '15:00-16:00', '16:00-17:00', '17:00-18:00'];
 const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 
@@ -19,8 +21,6 @@ class ClassList {
 }
 
 function readFile(path, callback) {
-    const fs = require("fs");
-
     fs.readFile(path, "utf8", (err, data) => {
         if (err) {
             console.error("File not found or could not be read:", err);
@@ -98,6 +98,16 @@ function scheduleExams(classList, examSlots, examDays, classrooms) {
     return "No feasible schedule found";
 }
 
+function writeToFile(filename, data) {
+    fs.writeFile(filename, data, (err) => {
+        if (err) {
+            console.error("Error writing to file:", err);
+        } else {
+            console.log(`Output written to ${filename}`);
+        }
+    });
+}
+
 function main() {
     readFile("Class_List.csv", function (classListData) {
         const classList = classListData.map(fields => new ClassList(Number(fields[0]), fields[1], fields[2], Number(fields[3])));
@@ -106,10 +116,24 @@ function main() {
             const classrooms = classroomCapacitiesData.map(fields => new Classroom(fields[0], Number(fields[1])));
 
             let examSchedule = scheduleExams(classList, TIME_SLOTS, DAYS, classrooms);
-            console.log("Exam Schedule:", examSchedule);
+
+            // Convert the exam schedule to a CSV-formatted string
+            let csvContent = "RoomID,Day,Time,ClassID,Professor,StudentID\n";
+            examSchedule.forEach(classroom => {
+                const roomID = classroom.roomID;
+                for (const day in classroom.schedule) {
+                    for (const time in classroom.schedule[day]) {
+                        const { courseId, professor, students } = classroom.schedule[day][time];
+                        const studentID = students.join(',');
+                        csvContent += `${roomID},${day},${time},${courseId},${professor},${studentID}\n`;
+                    }
+                }
+            });
+
+            // Write the CSV data to a file
+            writeToFile("Exam_Schedule.csv", csvContent);
         });
     });
 }
 
 main();
- 
