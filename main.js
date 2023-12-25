@@ -1,158 +1,108 @@
-const fs = require("fs");
+const fs = require('fs');
+const readlineSync = require('readline-sync');
 
-const TIME_SLOTS = ['9:00-10:00', '10:00-11:00', '11:00-12:00', '12:00-13:00', '13:00-14:00', '14:00-15:00', '15:00-16:00', '16:00-17:00', '17:00-18:00'];
-const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+// Function to read CSV file and return data as an array of objects
+function readCSV(filePath) {
+  const data = fs.readFileSync(filePath, 'utf8');
+  const lines = data.trim().split('\n');
+  const headers = lines[0].split(',');
 
-class Classroom {
-    constructor(roomID, classroomCapacity) {
-        this.roomID = roomID;
-        this.classroomCapacity = classroomCapacity;
-        this.schedule = {};
-    }
-}
-
-class ClassList {
-    constructor(studentID, professorName, courseID, examDuration) {
-        this.studentID = studentID;
-        this.professorName = professorName;
-        this.courseID = courseID;
-        this.examDuration = examDuration;
-    }
-}
-
-function readFile(path, callback) {
-    fs.readFile(path, "utf8", (err, data) => {
-        if (err) {
-            console.error("File not found or could not be read:", err);
-            return;
-        }
-
-        const lines = data.split("\n");
-        const output = lines.map(line => line.split(",").map(field => (field.trim() === 'undefined' ? undefined : field.trim())));
-
-        callback(output);
+  return lines.slice(1).map(line => {
+    const values = line.split(',');
+    const entry = {};
+    headers.forEach((header, i) => {
+      entry[header.trim()] = values[i].trim();
     });
+    return entry;
+  });
 }
 
-function isSlotAvailable(classroom, slot, examDay) {
-    const schedule = classroom.schedule;
+// Function to get user input for blocked hours
+function getBlockedHours() {
+  const blockedHours = {};
+  const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
-    if (schedule[examDay] && schedule[examDay][slot]) {
-        return false;
-    }
+  // Ask if there are blocked hours at the beginning
+  const hasBlockedHours = readlineSync.keyInYNStrict('Do you have blocked hours?');
+  if (!hasBlockedHours) {
+    return blockedHours;
+  }
 
-    return true;
+  // Ask for blocked hours for a specific day
+  const day = readlineSync.keyInSelect(days, 'Select the day for blocked hours:');
+  if (day === -1) {
+    // User pressed cancel, return empty blocked hours
+    return blockedHours;
+  }
+
+  // Ask for the specific hours on the selected day
+  const hours = readlineSync.question(`Enter blocked hours for ${days[day]} (e.g., 9:00 AM - 12:00 PM): `);
+  if (hours.trim() !== '') {
+    blockedHours[days[day]] = hours.trim();
+  }
+
+  return blockedHours;
 }
 
-function findSchedule(classList, index, classrooms, examSlots, examDays) {
-    // Base case: If all classes are scheduled, return true
-    if (index === classList.length) {
-        return true;
-    }
+// Function to schedule exams using backtracking
+function scheduleExams(classList, capacities, blockedHours) {
+  // Implementation of the scheduling algorithm goes here
+  // You may use backtracking, greedy algorithms, or other strategies
 
-    // Iterate through available slots and classrooms
-    for (const slot of examSlots) {
-        for (const classroom of classrooms) {
-            if (isSlotAvailable(classroom, slot, examDays[index])) {
-                const courseId = classList[index].courseID;
-                const { professorName, studentID } = classList[index];
+  // Placeholder for demonstration purposes
+  const schedule = {
+    Monday: [],
+    Tuesday: [],
+    Wednesday: [],
+    Thursday: [],
+    Friday: [],
+    Saturday: [],
+  };
 
-                // Create schedule entry for the class
-                if (!classroom.schedule[examDays[index]]) {
-                    classroom.schedule[examDays[index]] = {};
-                }
+  // Placeholder schedule output
+  classList.forEach((entry, index) => {
+    const day = Object.keys(schedule)[index % Object.keys(schedule).length];
+    const time = '9:00 AM - 10:30 AM';
+    const room = 'Room A301'; // Placeholder room assignment
+    const course = entry.CourseID;
+    schedule[day].push(`${time}: ${course} - ${room}`);
+  });
 
-                if (!classroom.schedule[examDays[index]][slot]) {
-                    classroom.schedule[examDays[index]][slot] = {
-                        courseId,
-                        professor: professorName,
-                        students: [studentID]
-                    };
-
-                    // Recursively try to schedule the next class
-                    if (findSchedule(classList, index + 1, classrooms, examSlots, examDays)) {
-                        return true; // If successful, return true
-                    }
-
-                    // Backtrack if scheduling fails
-                    delete classroom.schedule[examDays[index]][slot];
-
-                    if (Object.keys(classroom.schedule[examDays[index]]).length === 0) {
-                        delete classroom.schedule[examDays[index]];
-                    }
-                }
-            }
-        }
-    }
-
-    return false; // No feasible schedule found
+  return schedule;
 }
 
-function scheduleExams(classList, examSlots, examDays, classrooms) {
-    // Iterate through exam days
-    for (const examDay of examDays) {
-        // Create a new schedule for each exam day
-        let schedule = {};
+// Function to display the schedule and blocked hours
+function displaySchedule(schedule, blockedHours) {
+  console.log('\nExam Schedule:');
+  Object.keys(schedule).forEach(day => {
+    console.log(day);
+    schedule[day].forEach(entry => console.log(entry));
+  });
 
-        // Try to find a schedule starting from the first class
-        if (findSchedule(classList, 0, classrooms, examSlots, examDays)) {
-            // If a feasible schedule is found, return the schedule
-            return classrooms.map(classroom => ({
-                roomID: classroom.roomID,
-                schedule: classroom.schedule
-            }));
-        }
-    }
+  console.log('\nBlocked Hours:');
+  Object.keys(blockedHours).forEach(day => {
+    console.log(day);
+    console.log(`${blockedHours[day]}: Common Course`);
+  });
 
-    // If no feasible schedule is found for any exam day, return an error message
-    return "No feasible schedule found";
+  // Write schedule to CSV file
+  const csvContent = Object.keys(schedule).map(day => {
+    const dayEntries = schedule[day].map(entry => `${day},${entry}`);
+    return dayEntries.join('\n');
+  }).join('\n');
+
+  const outputFilePath = 'Exam_Schedule.csv';
+  fs.writeFileSync(outputFilePath, csvContent);
+  console.log(`\nExam schedule has been written to ${outputFilePath}`);
 }
 
-function formatExamSchedule(classrooms) {
-    let formattedSchedule = "Exam Schedule:\n";
+// Main program
+const classListPath = 'Class_List.csv';
+const capacitiesPath = 'Classroom_Capacities.csv';
 
-    for (const day in classrooms[0].schedule) {
-        formattedSchedule += `${day}\n`;
+const classList = readCSV(classListPath);
+const capacities = readCSV(capacitiesPath);
+const blockedHours = getBlockedHours();
 
-        for (const time in classrooms[0].schedule[day]) {
-            const { courseId, professor, students } = classrooms[0].schedule[day][time];
-            const studentID = students.join(',');
-
-            const formattedTime = time.replace('-', ' - ');
-
-            formattedSchedule += `${formattedTime}: ${courseId} - ${professor} - Room ${classrooms[0].roomID}\n`;
-        }
-    }
-
-    return formattedSchedule;
-}
-
-function writeToFile(filename, data) {
-    fs.writeFile(filename, data, (err) => {
-        if (err) {
-            console.error("Error writing to file:", err);
-        } else {
-            console.log(`Output written to ${filename}`);
-        }
-    });
-}
-
-function main() {
-    readFile("Class_List.csv", function (classListData) {
-        const classList = classListData.map(fields => new ClassList(Number(fields[0]), fields[1], fields[2], Number(fields[3])));
-
-        readFile("Classroom_Capacities.csv", function (classroomCapacitiesData) {
-            const classrooms = classroomCapacitiesData.map(fields => new Classroom(fields[0], Number(fields[1])));
-
-            let examSchedule = scheduleExams(classList, TIME_SLOTS, DAYS, classrooms);
-
-            // Convert the exam schedule to a formatted string
-            let formattedSchedule = formatExamSchedule(examSchedule);
-
-            // Write the formatted schedule to a file
-            writeToFile("Exam_Schedule.txt", formattedSchedule);
-        });
-    });
-}
-
-main();
+const examSchedule = scheduleExams(classList, capacities, blockedHours);
+displaySchedule(examSchedule, blockedHours);
