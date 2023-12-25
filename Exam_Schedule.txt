@@ -1,0 +1,18 @@
+Exam Schedule:
+Monday
+9:00 - 10:00: CourseID - ProfessorName - Room RoomID
+Tuesday
+9:00 - 10:00: CENG201 - John Smith - Room RoomID
+Wednesday
+9:00 - 10:00: CENG202 - John Smith - Room RoomID
+Thursday
+9:00 - 10:00: CHEM101 - Claire Moore - Room RoomID
+Friday
+9:00 - 10:00: MATH202 - Jane Doe - Room RoomID
+Saturday
+9:00 - 10:00: PSYCH201 - Carol White - Room RoomID
+Sunday
+9:00 - 10:00: CENG202 - John Smith - Room RoomID
+undefined
+9:00 - 10:00: MATH204 - Alice Johnson - Room RoomID
+10:00 - 11:00: ENGL102 - Bob Brown - Room RoomID
