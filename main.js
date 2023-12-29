@@ -1,11 +1,10 @@
-//Main javascript code
 const fs = require('fs');
 const readline = require('readline');
 
 // Days and hours
 const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
-const startHour = 9; // Start from 9 o'clock
-const endHour = 18; // To 18 o'clock
+const startHour = 9;  // Start from 9 o'clock
+const endHour = 18;  // To 18 o'clock
 
 function timeToMinutes(time) {
     const [hour, part] = time.split(':');
@@ -18,7 +17,7 @@ function minutesToTime(minutes) {
     const minute = minutes % 60;
     const newHour = hour > 12 ? hour - 12 : hour;
     const suffix = hour >= 12 ? 'PM' : 'AM';
-    return ${newHour}:${minute === 0 ? '00' : minute} ${suffix};
+    return `${newHour}:${minute === 0 ? '00' : minute} ${suffix}`;
 }
 
 async function readFileLines(filePath) {
@@ -42,13 +41,18 @@ async function assignCoursesToRooms(coursesFilePath, roomsFilePath) {
     const roomsLines = await readFileLines(roomsFilePath);
 
     const rooms = roomsLines.map(line => ({ roomId: line.split(',')[0], nextAvailableTime: startHour * 60, nextAvailableDay: 0 }));
-    const courseDetails = coursesLines.map(line => ({ courseId: line.split(',')[2], duration: parseInt(line.split(',')[3]) }));
+    const courseDetails = coursesLines.map(line => ({
+        studentId: line.split(',')[0],
+        courseId: line.split(',')[2],
+        duration: parseInt(line.split(',')[3])
+    }));
 
     let schedule = [];
+    let studentSchedules = {};
 
-    for (const { courseId, duration } of courseDetails) {
+    for (const { studentId, courseId, duration } of courseDetails) {
         const room = rooms.find(r => r.nextAvailableDay < days.length);
-        
+
         if (!room) {
             console.log('Uygun oda kalmadı!');
             break;
@@ -65,7 +69,17 @@ async function assignCoursesToRooms(coursesFilePath, roomsFilePath) {
             break;
         }
 
-        schedule.push(${courseId} ${days[room.nextAvailableDay]} ${minutesToTime(room.nextAvailableTime)} in room ${room.roomId});
+        //Öğrenci çakışma
+        const examTime = `${days[room.nextAvailableDay]} ${minutesToTime(room.nextAvailableTime)}`;
+        if (studentSchedules[studentId] && studentSchedules[studentId].includes(examTime)) {
+            console.log(`Hata: Öğrenci ${studentId} zaten ${examTime} zamanında bir sınavda.`);
+            continue;
+        }
+
+        studentSchedules[studentId] = studentSchedules[studentId] || [];
+        studentSchedules[studentId].push(examTime);
+
+        schedule.push(`${courseId} ${examTime} in room ${room.roomId}`);
         room.nextAvailableTime += duration;
     }
 
@@ -78,3 +92,4 @@ const roomsFilePath = 'Classroom_Capacities.csv';
 assignCoursesToRooms(coursesFilePath, roomsFilePath).then(schedule => {
     schedule.forEach(entry => console.log(entry));
 });
+
