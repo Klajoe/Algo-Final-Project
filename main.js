@@ -1,78 +1,80 @@
+//Main javascript code
 const fs = require('fs');
-const readlineSync = require('readline-sync');
+const readline = require('readline');
 
-// Function to read CSV file and return data as an array of objects
-function readCSV(filePath) {
-  const data = fs.readFileSync(filePath, 'utf8');
-  const lines = data.trim().split('\n');
-  const headers = lines[0].split(',');
+// Days and hours
+const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
+const startHour = 9; // Start from 9 o'clock
+const endHour = 18; // To 18 o'clock
 
-  return lines.slice(1).map(line => {
-    const values = line.split(',');
-    const entry = {};
-    headers.forEach((header, i) => {
-      entry[header.trim()] = values[i].trim();
+function timeToMinutes(time) {
+    const [hour, part] = time.split(':');
+    const baseTime = part.endsWith('AM') ? parseInt(hour) : parseInt(hour) + 12;
+    return baseTime * 60;
+}
+
+function minutesToTime(minutes) {
+    const hour = Math.floor(minutes / 60);
+    const minute = minutes % 60;
+    const newHour = hour > 12 ? hour - 12 : hour;
+    const suffix = hour >= 12 ? 'PM' : 'AM';
+    return ${newHour}:${minute === 0 ? '00' : minute} ${suffix};
+}
+
+async function readFileLines(filePath) {
+    const fileStream = fs.createReadStream(filePath);
+    const rl = readline.createInterface({
+        input: fileStream,
+        crlfDelay: Infinity
     });
-    return entry;
-  });
+
+    const lines = [];
+
+    for await (const line of rl) {
+        lines.push(line);
+    }
+
+    return lines.slice(1); // Skip the first line
 }
 
+async function assignCoursesToRooms(coursesFilePath, roomsFilePath) {
+    const coursesLines = await readFileLines(coursesFilePath);
+    const roomsLines = await readFileLines(roomsFilePath);
 
-function scheduleExams(classList, capacities) {
-  const schedule = {
-    Monday: [],
-    Tuesday: [],
-    Wednesday: [],
-    Thursday: [],
-    Friday: [],
-    Saturday: [],
-  };
+    const rooms = roomsLines.map(line => ({ roomId: line.split(',')[0], nextAvailableTime: startHour * 60, nextAvailableDay: 0 }));
+    const courseDetails = coursesLines.map(line => ({ courseId: line.split(',')[2], duration: parseInt(line.split(',')[3]) }));
 
-  const rooms = ['A301', 'A302', 'A303', 'A304', 'A305']; // Örnek sınıf listesi
-  let roomIndex = 0;
+    let schedule = [];
 
-  classList.forEach((entry, index) => {
-    const day = Object.keys(schedule)[index % Object.keys(schedule).length];
-    const time = '9:00 AM - 10:30 AM';
-    const room = rooms[roomIndex]; // Sınıf seçimi
-    const course = entry.CourseID;
-    schedule[day].push(${time}: ${course} - ${room});
+    for (const { courseId, duration } of courseDetails) {
+        const room = rooms.find(r => r.nextAvailableDay < days.length);
+        
+        if (!room) {
+            console.log('Uygun oda kalmadı!');
+            break;
+        }
 
-    // Sonraki sınıfa geç
-    roomIndex = (roomIndex + 1) % rooms.length;
-  });
+        const endTime = room.nextAvailableTime + duration;
+        if (endTime / 60 > endHour) {
+            room.nextAvailableTime = startHour * 60;
+            room.nextAvailableDay++;
+        }
 
-  return schedule;
+        if (room.nextAvailableDay >= days.length) {
+            console.log('Uygun zaman dilimi kalmadı!');
+            break;
+        }
+
+        schedule.push(${courseId} ${days[room.nextAvailableDay]} ${minutesToTime(room.nextAvailableTime)} in room ${room.roomId});
+        room.nextAvailableTime += duration;
+    }
+
+    return schedule;
 }
 
+const coursesFilePath = 'Class_List.csv'; 
+const roomsFilePath = 'Classroom_Capacities.csv'; 
 
-// Function to display the schedule and blocked hours
-function displaySchedule(schedule ) {
-  console.log('\nExam Schedule:');
-  Object.keys(schedule).forEach(day => {
-    console.log(day);
-    schedule[day].forEach(entry => console.log(entry));
-  });
-
-  
-  // Write schedule to CSV file
-  const csvContent = Object.keys(schedule).map(day => {
-    const dayEntries = schedule[day].map(entry => ${day},${entry});
-    return dayEntries.join('\n');
-  }).join('\n');
-
-  const outputFilePath = 'Exam_Schedule.csv';
-  fs.writeFileSync(outputFilePath, csvContent);
-  console.log(\nExam schedule has been written to ${outputFilePath});
-}
-
-// Main program
-const classListPath = 'Class_List.csv';
-const capacitiesPath = 'Classroom_Capacities.csv';
-
-const classList = readCSV(classListPath);
-const capacities = readCSV(capacitiesPath);
-
-
-const examSchedule = scheduleExams(classList, capacities, );
-displaySchedule(examSchedule, );
+assignCoursesToRooms(coursesFilePath, roomsFilePath).then(schedule => {
+    schedule.forEach(entry => console.log(entry));
+});
