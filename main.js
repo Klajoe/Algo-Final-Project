@@ -1,10 +1,11 @@
 const fs = require('fs');
 const readline = require('readline');
+const prompt = require('prompt-sync')({ sigint: true });
 
-// Days and hours
+// Günler ve saatler için sabitler
 const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
-const startHour = 9;  // Start from 9 o'clock
-const endHour = 18;  // To 18 o'clock
+const startHour = 9; // Sabah 9:00 başlangıç saati
+const endHour = 18; // Akşam 6:00 bitiş saati
 
 function timeToMinutes(time) {
     const [hour, part] = time.split(':');
@@ -33,7 +34,7 @@ async function readFileLines(filePath) {
         lines.push(line);
     }
 
-    return lines.slice(1); // Skip the first line
+    return lines.slice(1); // İlk satırı (başlık satırını) atla
 }
 
 async function assignCoursesToRooms(coursesFilePath, roomsFilePath) {
@@ -49,6 +50,27 @@ async function assignCoursesToRooms(coursesFilePath, roomsFilePath) {
 
     let schedule = [];
     let studentSchedules = {};
+
+    // Kullanıcıdan blocked hour bilgisi al
+    const hasBlockedHour = prompt('Blocked hour var mı? (y/n): ').toLowerCase() === 'y';
+    let blockedCourseId;
+    if (hasBlockedHour) {
+        blockedCourseId = prompt('Hangi dersi bloke etmek istiyorsunuz? (Örnek: CENG201): ');
+    }
+
+    // Blocked hour varsa, Pazartesi ilk sıraya yerleştir
+    if (blockedCourseId) {
+        const blockedCourse = courseDetails.find(course => course.courseId === blockedCourseId);
+        if (blockedCourse) {
+            const startTime = '9:00 AM';
+            const endTime = minutesToTime(timeToMinutes(startTime) + blockedCourse.duration);
+            schedule.push(`${blockedCourse.courseId} Monday ${startTime} - ${endTime} in room ${rooms[0].roomId}`);
+            rooms[0].nextAvailableTime = timeToMinutes(endTime);
+            courseDetails.splice(courseDetails.indexOf(blockedCourse), 1);
+        } else {
+            console.log('Belirtilen ders bulunamadı.');
+        }
+    }
 
     for (const { studentId, courseId, duration } of courseDetails) {
         const room = rooms.find(r => r.nextAvailableDay < days.length);
@@ -69,8 +91,10 @@ async function assignCoursesToRooms(coursesFilePath, roomsFilePath) {
             break;
         }
 
-        //Öğrenci çakışma
-        const examTime = `${days[room.nextAvailableDay]} ${minutesToTime(room.nextAvailableTime)}`;
+        // Öğrenci çakışma kontrolü
+        const examTimeStart = minutesToTime(room.nextAvailableTime);
+        const examTimeEnd = minutesToTime(endTime);
+        const examTime = `${days[room.nextAvailableDay]} ${examTimeStart} - ${examTimeEnd}`;
         if (studentSchedules[studentId] && studentSchedules[studentId].includes(examTime)) {
             console.log(`Hata: Öğrenci ${studentId} zaten ${examTime} zamanında bir sınavda.`);
             continue;
@@ -80,16 +104,15 @@ async function assignCoursesToRooms(coursesFilePath, roomsFilePath) {
         studentSchedules[studentId].push(examTime);
 
         schedule.push(`${courseId} ${examTime} in room ${room.roomId}`);
-        room.nextAvailableTime += duration;
+        room.nextAvailableTime = endTime;
     }
 
     return schedule;
 }
 
-const coursesFilePath = 'Class_List.csv'; 
-const roomsFilePath = 'Classroom_Capacities.csv'; 
+const coursesFilePath = 'Class_List.csv'; // Dersler CSV dosya yolu
+const roomsFilePath = 'Classroom_Capacities.csv'; // Sınıf odaları CSV dosya yolu
 
 assignCoursesToRooms(coursesFilePath, roomsFilePath).then(schedule => {
     schedule.forEach(entry => console.log(entry));
 });
-
