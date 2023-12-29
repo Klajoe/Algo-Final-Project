@@ -4,8 +4,8 @@ const prompt = require('prompt-sync')({ sigint: true });
 
 // Günler ve saatler için sabitler
 const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
-const startHour = 9; // Sabah 9:00 başlangıç saati
-const endHour = 18; // Akşam 6:00 bitiş saati
+const startHour = 9; // Sabah 9:00 başlangıç saati (09:00 olarak 24 saatlik formatta)
+const endHour = 18; // Akşam 6:00 bitiş saati (18:00 olarak 24 saatlik formatta)
 
 function timeToMinutes(time) {
     const [hour, part] = time.split(':');
@@ -16,9 +16,7 @@ function timeToMinutes(time) {
 function minutesToTime(minutes) {
     const hour = Math.floor(minutes / 60);
     const minute = minutes % 60;
-    const newHour = hour > 12 ? hour - 12 : hour;
-    const suffix = hour >= 12 ? 'PM' : 'AM';
-    return `${newHour}:${minute === 0 ? '00' : minute} ${suffix}`;
+    return `${hour < 10 ? '0' + hour : hour}:${minute === 0 ? '00' : minute}`;
 }
 
 async function readFileLines(filePath) {
@@ -43,13 +41,11 @@ async function assignCoursesToRooms(coursesFilePath, roomsFilePath) {
 
     const rooms = roomsLines.map(line => ({ roomId: line.split(',')[0], nextAvailableTime: startHour * 60, nextAvailableDay: 0 }));
     const courseDetails = coursesLines.map(line => ({
-        studentId: line.split(',')[0],
         courseId: line.split(',')[2],
         duration: parseInt(line.split(',')[3])
     }));
 
     let schedule = [];
-    let studentSchedules = {};
 
     // Kullanıcıdan blocked hour bilgisi al
     const hasBlockedHour = prompt('Blocked hour var mı? (y/n): ').toLowerCase() === 'y';
@@ -62,49 +58,38 @@ async function assignCoursesToRooms(coursesFilePath, roomsFilePath) {
     if (blockedCourseId) {
         const blockedCourse = courseDetails.find(course => course.courseId === blockedCourseId);
         if (blockedCourse) {
-            const startTime = '9:00 AM';
-            const endTime = minutesToTime(timeToMinutes(startTime) + blockedCourse.duration);
-            schedule.push(`${blockedCourse.courseId} Monday ${startTime} - ${endTime} in room ${rooms[0].roomId}`);
-            rooms[0].nextAvailableTime = timeToMinutes(endTime);
+            const startTime = startHour * 60; // 09:00
+            const endTime = startTime + blockedCourse.duration;
+            schedule.push(`${blockedCourse.courseId} Monday ${minutesToTime(startTime)} - ${minutesToTime(endTime)} in room ${rooms[0].roomId}`);
+            rooms[0].nextAvailableTime = endTime;
             courseDetails.splice(courseDetails.indexOf(blockedCourse), 1);
         } else {
             console.log('Belirtilen ders bulunamadı.');
         }
     }
 
-    for (const { studentId, courseId, duration } of courseDetails) {
-        const room = rooms.find(r => r.nextAvailableDay < days.length);
+    for (const { courseId, duration } of courseDetails) {
+        let assigned = false;
+        for (const room of rooms) {
+            if (assigned) break;
 
-        if (!room) {
-            console.log('Uygun oda kalmadı!');
-            break;
+            while (room.nextAvailableDay < days.length) {
+                const endTime = room.nextAvailableTime + duration;
+                if (endTime / 60 <= endHour) {
+                    schedule.push(`${courseId} ${days[room.nextAvailableDay]} ${minutesToTime(room.nextAvailableTime)} - ${minutesToTime(endTime)} in room ${room.roomId}`);
+                    room.nextAvailableTime = endTime;
+                    assigned = true;
+                    break;
+                } else {
+                    room.nextAvailableDay++;
+                    room.nextAvailableTime = startHour * 60;
+                }
+            }
         }
 
-        const endTime = room.nextAvailableTime + duration;
-        if (endTime / 60 > endHour) {
-            room.nextAvailableTime = startHour * 60;
-            room.nextAvailableDay++;
+        if (!assigned) {
+            console.log(`Uygun zaman dilimi bulunamadı: ${courseId}`);
         }
-
-        if (room.nextAvailableDay >= days.length) {
-            console.log('Uygun zaman dilimi kalmadı!');
-            break;
-        }
-
-        // Öğrenci çakışma kontrolü
-        const examTimeStart = minutesToTime(room.nextAvailableTime);
-        const examTimeEnd = minutesToTime(endTime);
-        const examTime = `${days[room.nextAvailableDay]} ${examTimeStart} - ${examTimeEnd}`;
-        if (studentSchedules[studentId] && studentSchedules[studentId].includes(examTime)) {
-            console.log(`Hata: Öğrenci ${studentId} zaten ${examTime} zamanında bir sınavda.`);
-            continue;
-        }
-
-        studentSchedules[studentId] = studentSchedules[studentId] || [];
-        studentSchedules[studentId].push(examTime);
-
-        schedule.push(`${courseId} ${examTime} in room ${room.roomId}`);
-        room.nextAvailableTime = endTime;
     }
 
     return schedule;
