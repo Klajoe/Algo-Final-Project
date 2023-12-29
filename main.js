@@ -9,7 +9,7 @@ const endHour = 18; // Akşam 6:00 bitiş saati (18:00 olarak 24 saatlik formatt
 
 function timeToMinutes(time) {
     const [hour, part] = time.split(':');
-    const baseTime = part.endsWith('AM') ? parseInt(hour) : parseInt(hour) + 12;
+    const baseTime = parseInt(hour) + (part.endsWith('PM') && hour !== '12' ? 12 : 0);
     return baseTime * 60;
 }
 
@@ -47,24 +47,34 @@ async function assignCoursesToRooms(coursesFilePath, roomsFilePath) {
 
     let schedule = [];
 
-    // Kullanıcıdan blocked hour bilgisi al
-    const hasBlockedHour = prompt('Blocked hour var mı? (y/n): ').toLowerCase() === 'y';
-    let blockedCourseId;
-    if (hasBlockedHour) {
-        blockedCourseId = prompt('Hangi dersi bloke etmek istiyorsunuz? (Örnek: CENG201): ');
+    // Kullanıcıdan özel zaman dilimi bilgisi al
+    const hasSpecialTime = prompt('Özel bir zaman dilimi belirlemek istiyor musunuz? (y/n): ').toLowerCase() === 'y';
+    let specialDay, specialTime, specialCourseId;
+    if (hasSpecialTime) {
+        specialDay = prompt('Hangi gün? (Örnek: Tuesday): ');
+        specialTime = prompt('Hangi saat? (Örnek: 10:00 AM): ');
+        specialCourseId = prompt('Hangi ders? (Örnek: MATH202): ');
     }
 
-    // Blocked hour varsa, Pazartesi ilk sıraya yerleştir
-    if (blockedCourseId) {
-        const blockedCourse = courseDetails.find(course => course.courseId === blockedCourseId);
-        if (blockedCourse) {
-            const startTime = startHour * 60; // 09:00
-            const endTime = startTime + blockedCourse.duration;
-            schedule.push(`${blockedCourse.courseId} Monday ${minutesToTime(startTime)} - ${minutesToTime(endTime)} in room ${rooms[0].roomId}`);
-            rooms[0].nextAvailableTime = endTime;
-            courseDetails.splice(courseDetails.indexOf(blockedCourse), 1);
+    // Özel zaman dilimi varsa, o dersi önce yerleştir
+    if (specialDay && specialTime && specialCourseId) {
+        const specialDayIndex = days.indexOf(specialDay.charAt(0).toUpperCase() + specialDay.slice(1).toLowerCase());
+        const startTime = timeToMinutes(specialTime);
+        const specialCourse = courseDetails.find(course => course.courseId === specialCourseId);
+
+        if (specialCourse && specialDayIndex !== -1 && startTime >= startHour * 60 && startTime + specialCourse.duration <= endHour * 60) {
+            const endTime = startTime + specialCourse.duration;
+            schedule.push(`${specialCourse.courseId} ${days[specialDayIndex]} ${minutesToTime(startTime)} - ${minutesToTime(endTime)} in room ${rooms[0].roomId}`);
+            if (specialDayIndex === 0) { // Eğer Pazartesi ise, diğer dersleri etkilememesi için bir sonraki odaya geç
+                rooms[1].nextAvailableTime = endTime;
+                rooms[1].nextAvailableDay = 0;
+            } else {
+                rooms[0].nextAvailableTime = endTime;
+                rooms[0].nextAvailableDay = specialDayIndex;
+            }
+            courseDetails.splice(courseDetails.indexOf(specialCourse), 1);
         } else {
-            console.log('Belirtilen ders bulunamadı.');
+            console.log('Belirtilen ders, gün veya saat hatalı.');
         }
     }
 
