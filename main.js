@@ -1,116 +1,163 @@
-const fs = require('fs');
+const fs = require('fs').promises
 const readline = require('readline');
-const prompt = require('prompt-sync')({ sigint: true });
 
-const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
-const startHour = 9; // 9:00 AM
-const endHour = 18; // 6:00 PM
-
-function timeToMinutes(time) {
-    const [hour, part] = time.split(':');
-    const baseTime = parseInt(hour) + (part.endsWith('PM') && hour !== '12' ? 12 : 0);
-    return baseTime * 60;
+const rl = readline.createInterface({
+    input: process.stdin,
+    output: process.stdout
+  })
+  
+function askQuestion(query) {
+    return new Promise(resolve => rl.question(query, ans => resolve(ans) ))
 }
 
-function minutesToTime(minutes) {
-    const hour = Math.floor(minutes / 60);
-    const minute = minutes % 60;
-    return `${hour < 10 ? '0' + hour : hour}:${minute === 0 ? '00' : minute}`;
+async function askCommonCourses() {
+    let numberOfCourses = parseInt(await askQuestion("How many common courses would you like to add (ex. '4')? "))
+    for (let i = 0; i < numberOfCourses; i++) {
+        let courseName = await askQuestion("Enter the name of the common course (ex. 'CENG303'): ")
+        let startTimeString = await askQuestion("Enter starting time of the common course (ex. '15:00'): ")
+        let minuteAndSecond = startTimeString.split(':')
+        let courseStartTime = new Time(parseInt(minuteAndSecond[0]), parseInt(minuteAndSecond[1]))
+        let endTimeString = await askQuestion("Enter ending time of the common course (ex. '16:00'): ")
+        minuteAndSecond = endTimeString.split(':')
+        let courseEndTime = new Time(parseInt(minuteAndSecond[0]), parseInt(minuteAndSecond[1]))
+        let day = await askQuestion("Enter the day of the common course (ex. 'Tuesday'): ")
+      
+        commonCourses.push(new Exam(courseName, undefined, courseStartTime, courseEndTime, day))
+        console.log(`${i + 1}. common course has added.`);
+        console.log(`Name - ${courseName}, Start Time - ${courseStartTime}, End Time - ${courseEndTime}, Day - ${day}\n`)
+    }
+    rl.close()
 }
 
-async function readFileLines(filePath) {
-    const fileStream = fs.createReadStream(filePath);
-    const rl = readline.createInterface({
-        input: fileStream,
-        crlfDelay: Infinity
-    });
+var classList = [] // array of CSV data {StudentID,ProfessorName,CourseID,ExamDuration}
+var classrooms = [] // array of CSV data {RoomID,Capacity}
+var exams = [] // array of {ProfessorName,CourseID,ExamDuration}
+var commonCourses = [] // array of common courses, Exam objects
+var daysOfWeek = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
 
-    const lines = [];
+async function CSVtoArray(fileName) {
+    let list = []
+    const data = await fs.readFile(fileName, 'utf8')
+    let lines = data.trim().split('\n')
 
-    for await (const line of rl) {
-        lines.push(line);
+    const headers = lines[0].split(',')
+    for (let i = 1; i < lines.length; i++) {
+        let values = lines[i].split(',')
+        let item = {}
+
+        for (let j = 0; j < headers.length; j++) {
+            item[headers[j].trim()] = values[j].trim()
+        }
+        list.push(item)
+    }
+    return list
+}
+
+async function createExams() {
+    let list = []
+    let uniqueExams = new Set()
+
+    classList.forEach(function(item) {
+    let examString = item.ProfessorName + item.CourseID + item.ExamDuration
+
+    if (!uniqueExams.has(examString)) {
+        uniqueExams.add(examString)
+        list.push(new Exam(item.CourseID, item.ExamDuration))
+    }
+    })
+    return list
+}
+
+async function createClassrooms() {
+    list = []
+    for (let classroom in classrooms) {
+        list.push(new Classroom(classroom['RoomID'], classroom['Capasity']))
+    }
+    return list
+}
+
+const main = async function () {
+    await askCommonCourses()
+    console.log(commonCourses)
+    classList = await CSVtoArray('Class_List.csv')
+    classrooms = await createClassrooms(await CSVtoArray('Classroom_Capacities.csv'))
+    exams = await createExams()
+    const schedule = new Schedule()
+    console.log(schedule)
+}
+
+main()
+
+// CLASSES
+
+class Time {
+    constructor(hour, minute) {
+        this.hour = hour
+        this.minute = minute
+    }
+  
+    toString() {
+        return `${this.formatTime(this.hour)}:${this.formatTime(this.minute)}`
+    }
+  
+    formatTime(value) {
+        return value < 10 ? `0${value}` : `${value}`
+    }
+}
+  
+class Exam {
+    constructor(CourseID, ExamDuration, startTime = undefined, endTime = undefined, day = undefined, commonCourse = false) {
+        this.CourseID = CourseID
+        this.ExamDuration = ExamDuration
+        this.startTime = startTime
+        this.endTime = endTime
+        this.RoomID = undefined
+        this.day = undefined
+        this.commonCourse = commonCourse
+    }
+  
+    toString() {
+        return this.commonCourse
+        ? `${this.startTime.toString()} - ${this.endTime.toString()}: Common Course (${this.CourseID})` 
+        : `${this.startTime.toString()} - ${this.endTime.toString()}: ${this.CourseID} - ${this.room}`
+    }
+}
+
+class Classroom {
+    constructor(RoomID, Capacity) {
+        this.RoomID = RoomID
+        this.Capacity = Capacity
+        this.Sessions = []
+    }
+}
+
+class Schedule {
+    constructor() {
+        this.days = []
+        for (let i = 0; i < 6; i++) {
+            let item = []
+            item[daysOfWeek[i]] = classrooms
+            this.days.push(item)
+        }
+        //this.initializeSchedule()
     }
 
-    return lines.slice(1); // Skip the header line
-}
+    addExtraDay() {
+        let item = {}
+        let numberOfDays = this.days.length
 
-async function assignCoursesToRooms(coursesFilePath, roomsFilePath) {
-    const coursesLines = await readFileLines(coursesFilePath);
-    const roomsLines = await readFileLines(roomsFilePath);
-
-    const rooms = roomsLines.map(line => ({ roomId: line.split(',')[0], nextAvailableTime: startHour * 60, nextAvailableDay: 0 }));
-    const courseDetails = coursesLines.map(line => ({
-        studentId: line.split(',')[0],
-        professorName: line.split(',')[1],
-        courseId: line.split(',')[2],
-        duration: parseInt(line.split(',')[3])
-    }));
-
-    let schedule = [];
-
-    // Kullanıcıdan özel zaman dilimi bilgisi al
-    const hasSpecialTime = prompt('Özel bir zaman dilimi belirlemek istiyor musunuz? (y/n): ').toLowerCase() === 'y';
-    let specialDay, specialTime, specialCourseId;
-    if (hasSpecialTime) {
-        specialDay = prompt('Hangi gün? (Örnek: Tuesday): ');
-        specialTime = prompt('Hangi saat? (Örnek: 10:00 AM): ');
-        specialCourseId = prompt('Hangi ders? (Örnek: MATH202): ');
-    }
-
-    // Özel zaman dilimi varsa, o dersi önce yerleştir
-    if (specialDay && specialTime && specialCourseId) {
-        const specialDayIndex = days.indexOf(specialDay.charAt(0).toUpperCase() + specialDay.slice(1).toLowerCase());
-        const startTime = timeToMinutes(specialTime);
-        const specialCourse = courseDetails.find(course => course.courseId === specialCourseId);
-
-        if (specialCourse && specialDayIndex !== -1 && startTime >= startHour * 60 && startTime + specialCourse.duration <= endHour * 60) {
-            const endTime = startTime + specialCourse.duration;
-            schedule.push(`${days[specialDayIndex]},${minutesToTime(startTime)} - ${minutesToTime(endTime)}: ${specialCourse.courseId} - Room ${rooms[0].roomId}`);
-            if (specialDayIndex === 0) { // Eğer Pazartesi ise, diğer dersleri etkilememesi için bir sonraki odaya geç
-                rooms[1].nextAvailableTime = endTime;
-                rooms[1].nextAvailableDay = 0;
-            } else {
-                rooms[0].nextAvailableTime = endTime;
-                rooms[0].nextAvailableDay = specialDayIndex;
-            }
-            courseDetails.splice(courseDetails.indexOf(specialCourse), 1);
+        if (numberOfDays > 6) {
+            item[daysOfWeek[numberOfDays % 7]] = classrooms  
         } else {
-            console.log('Belirtilen ders, gün veya saat hatalı.');
+            item[daysOfWeek[6]] = classrooms
         }
+        this.days.push(item)
     }
 
-    for (const { studentId, professorName, courseId, duration } of courseDetails) {
-        let assigned = false;
-
-        for (const room of rooms) {
-            if (assigned) break;
-
-            while (room.nextAvailableDay < days.length) {
-                const endTime = room.nextAvailableTime + duration;
-
-                if (endTime / 60 <= endHour) {
-                    schedule.push(`${days[room.nextAvailableDay]},${minutesToTime(room.nextAvailableTime)} - ${minutesToTime(endTime)}: ${courseId} - Room ${room.roomId}`);
-                    room.nextAvailableTime = endTime;
-                    assigned = true;
-                    break;
-                } else {
-                    room.nextAvailableDay++;
-                    room.nextAvailableTime = startHour * 60;
-                }
-            }
-        }
-
-        if (!assigned) {
-            console.log(`Uygun zaman dilimi bulunamadı: ${courseId}`);
-        }
-    }
-
-    return schedule;
+    // initializeSchedule()
+    // findAvailableSlot
+    // swapSessions(exam1, exam2)
+    // cost()
+    // simulatedAnnealing() ?
+    // ...
 }
-
-const coursesFilePath = 'Class_List.csv'; // Courses CSV file path
-const roomsFilePath = 'Classroom_Capacities.csv'; // Rooms CSV file path
-
-assignCoursesToRooms(coursesFilePath, roomsFilePath).then(schedule => {
-    schedule.forEach(entry => console.log(entry));
-});
