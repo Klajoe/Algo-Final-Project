@@ -4,10 +4,10 @@ const readline = require('readline');
 const rl = readline.createInterface({
     input: process.stdin,
     output: process.stdout
-  })
+})
   
-function askQuestion(query) {
-    return new Promise(resolve => rl.question(query, ans => resolve(ans) ))
+function askQuestion(query) { 
+    return new Promise(resolve => rl.question(query, ans => resolve(ans)))
 }
 
 async function askCommonCourses() {
@@ -22,18 +22,18 @@ async function askCommonCourses() {
         let courseEndTime = new Time(parseInt(minuteAndSecond[0]), parseInt(minuteAndSecond[1]))
         let day = await askQuestion("Enter the day of the common course (ex. 'Tuesday'): ")
       
-        commonCourses.push(new Exam(courseName, undefined, courseStartTime, courseEndTime, day))
+        commonCourseExams.push(new Exam(courseName, undefined, courseStartTime, courseEndTime, day))
         console.log(`${i + 1}. common course has added.`);
         console.log(`Name - ${courseName}, Start Time - ${courseStartTime}, End Time - ${courseEndTime}, Day - ${day}\n`)
     }
     rl.close()
 }
 
+var daysOfWeek = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
 var classList = [] // array of CSV data {StudentID,ProfessorName,CourseID,ExamDuration}
 var classrooms = [] // array of CSV data {RoomID,Capacity}
 var exams = [] // array of {ProfessorName,CourseID,ExamDuration}
-var commonCourses = [] // array of common courses, Exam objects
-var daysOfWeek = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+var commonCourseExams = [] // array of common courses, Exam objects
 
 async function CSVtoArray(fileName) {
     let list = []
@@ -54,18 +54,15 @@ async function CSVtoArray(fileName) {
 }
 
 async function createExams() {
-    let list = []
     let uniqueExams = new Set()
 
     classList.forEach(function(item) {
-    let examString = item.ProfessorName + item.CourseID + item.ExamDuration
-
-    if (!uniqueExams.has(examString)) {
-        uniqueExams.add(examString)
-        list.push(new Exam(item.CourseID, item.ExamDuration))
-    }
+        let examString = item.ProfessorName + item.CourseID + item.ExamDuration
+        if (!uniqueExams.has(examString)) {
+            uniqueExams.add(examString)
+            exams.push(new Exam(item.CourseID, item.ExamDuration))
+        }
     })
-    return list
 }
 
 async function createClassrooms() {
@@ -77,13 +74,12 @@ async function createClassrooms() {
 }
 
 const main = async function () {
-    await askCommonCourses()
-    console.log(commonCourses)
     classList = await CSVtoArray('Class_List.csv')
     classrooms = await createClassrooms(await CSVtoArray('Classroom_Capacities.csv'))
-    exams = await createExams()
+    await askCommonCourses()
+    await createExams()
     const schedule = new Schedule()
-    console.log(schedule)
+    console.log(schedule.days['Monday'])
 }
 
 main()
@@ -114,12 +110,22 @@ class Exam {
         this.RoomID = undefined
         this.day = undefined
         this.commonCourse = commonCourse
+
+        if (this.startTime != undefined && this.endTime == undefined) {
+            let hour = Math.floor(ExamDuration / 60) + this.startTime.hour
+            let minute = ExamDuration % 60 + this.startTime.minute
+            if (minute >= 60) {
+                hour++
+                minute -= 60
+            }
+            this.endTime = new Time(hour, minute)
+        }
     }
   
     toString() {
         return this.commonCourse
-        ? `${this.startTime.toString()} - ${this.endTime.toString()}: Common Course (${this.CourseID})` 
-        : `${this.startTime.toString()} - ${this.endTime.toString()}: ${this.CourseID} - ${this.room}`
+            ? this.startTime.toString() +  " - " + this.endTime.toString() + ": Common Course (" + this.CourseID + ")"
+            : this.startTime.toString() +  " - " + this.endTime.toString() + ":" + this.CourseID + " - " + this.RoomID
     }
 }
 
@@ -139,7 +145,7 @@ class Schedule {
             item[daysOfWeek[i]] = classrooms
             this.days.push(item)
         }
-        //this.initializeSchedule()
+        this.initializeSchedule()
     }
 
     addExtraDay() {
@@ -154,7 +160,14 @@ class Schedule {
         this.days.push(item)
     }
 
-    // initializeSchedule()
+    findAvailableTime(day, exam) {
+        // for (let exam in this.days[day].classrooms.Sessions) {}
+    }
+
+    initializeSchedule() {
+
+    }
+
     // findAvailableSlot
     // swapSessions(exam1, exam2)
     // cost()
