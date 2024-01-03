@@ -27,7 +27,7 @@ async function askCommonCourses() {
         console.log(`Name - ${courseName}, Start Time - ${courseStartTime}, End Time - ${courseEndTime}, Day - ${day}\n`)
     }
     rl.close()
-}
+} 
 
 var daysOfWeek = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
 var classList = [] // array of CSV data {StudentID,ProfessorName,CourseID,ExamDuration}
@@ -65,10 +65,10 @@ async function createExams() {
     })
 }
 
-async function createClassrooms() {
+async function createClassrooms(classroomList) {
     list = []
-    for (let classroom in classrooms) {
-        list.push(new Classroom(classroom['RoomID'], classroom['Capasity']))
+    for (let i in classroomList) {
+        list.push(new Classroom(classroomList[i]['RoomID'], classroomList[i]['Capacity']))
     }
     return list
 }
@@ -78,8 +78,8 @@ const main = async function () {
     classrooms = await createClassrooms(await CSVtoArray('Classroom_Capacities.csv'))
     await askCommonCourses()
     await createExams()
-    const schedule = new Schedule()
-    console.log(schedule.days['Monday'])
+    const schedule = new Schedule(classrooms)
+    console.log(schedule.days[0])
 }
 
 main()
@@ -138,7 +138,8 @@ class Classroom {
 }
 
 class Schedule {
-    constructor() {
+    constructor(classrooms) {
+        this.classrooms = classrooms
         this.days = []
         for (let i = 0; i < 6; i++) {
             let item = []
@@ -153,9 +154,9 @@ class Schedule {
         let numberOfDays = this.days.length
 
         if (numberOfDays > 6) {
-            item[daysOfWeek[numberOfDays % 7]] = classrooms  
+            item[daysOfWeek[numberOfDays % 7]] = this.classrooms  
         } else {
-            item[daysOfWeek[6]] = classrooms
+            item[daysOfWeek[6]] = this.classrooms
         }
         this.days.push(item)
     }
@@ -174,3 +175,5 @@ class Schedule {
     // simulatedAnnealing() ?
     // ...
 }
+
+
