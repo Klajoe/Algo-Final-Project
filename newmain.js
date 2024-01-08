@@ -57,7 +57,7 @@ async function assignCoursesToRooms(coursesFilePath, roomsFilePath) {
     const coursesLines = await readFileLines(coursesFilePath);
     const roomsLines = await readFileLines(roomsFilePath);
 
-    const rooms = roomsLines.map(line => ({ roomId: line.split(',')[0], nextAvailableTime: startHour * 60, nextAvailableDay: 0, blockedTime: Infinity}));
+    const rooms = roomsLines.map(line => ({ roomId: line.split(',')[0],roomSize: line.split(',')[1], nextAvailableTime: startHour * 60, nextAvailableDay: 0, blockedTime: Infinity}));
     const courseDetails = coursesLines.map(line => ({
         studentId: line.split(',')[0],
         professorName: line.split(',')[1],
@@ -91,14 +91,39 @@ async function assignCoursesToRooms(coursesFilePath, roomsFilePath) {
     }
 
     for (const { studentId, professorName, courseId, duration } of courseDetails) {
+        if(courses.findIndex(course => course.name === courseId) == -1){
+            courses.push({ name: courseId, count: 1 });
+        }
+        else{
+            let inx = courses.findIndex(course => course.name === courseId);
+            courses[inx].count++;
+        }  
 
-        if(courses.indexOf(courseId) == -1){
-            courses.push(courseId);
+    }
+
+    console.log(courses);
+
+    for (const { studentId, professorName, courseId, duration } of courseDetails) {
+
+        let tempInx,tempSize;
+
+        if(courses.findIndex(course => course.name === courseId) != -1){
+            tempInx = courses.findIndex(course => course.name === courseId);
+            tempSize = courses[tempInx].count;
+
+            if(tempInx == 0)
+                courses.splice(0,1);
+            else
+                courses.splice(temp,temp);
 
             let assigned = false;
 
             for (const room of rooms) {
                 if (assigned) break;
+
+                if(room.roomSize/2<tempSize){
+                    continue;
+                }
     
                 const slot = findNextAvailableSlot(duration, room);
     
@@ -135,13 +160,12 @@ async function assignCoursesToRooms(coursesFilePath, roomsFilePath) {
                     }
                 }
     
-              
             }
     
             if (!assigned) {
                 console.log(`No available time slot found for: ${courseId}`);
             }
-        }        
+        }      
     }
 
     return schedule;
