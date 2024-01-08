@@ -6,6 +6,8 @@ const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
 const startHour = 9; // 9:00 AM
 const endHour = 18; // 6:00 PM
 
+let courses = [];
+
 function timeToMinutes(time) {
     const [hour, minute] = time.match(/(\d+):(\d+)/).slice(1, 3);
     return parseInt(hour) * 60 + parseInt(minute);
@@ -90,24 +92,35 @@ async function assignCoursesToRooms(coursesFilePath, roomsFilePath) {
 
     for (const { studentId, professorName, courseId, duration } of courseDetails) {
 
-        let assigned = false;
+        if(courses.indexOf(courseId) == -1){
+            courses.push(courseId);
 
-        for (const room of rooms) {
-            if (assigned) break;
+            let assigned = false;
 
-            const slot = findNextAvailableSlot(duration, room);
-
-            if (slot) {
-                const { dayIndex, startTime, endTime } = slot;
-                if(dayIndex == blockedDayIndex){
-                    if(blockHour){
-                        if((startTime<=blockedStartTime && blockedStartTime + 60 <= endHour*60) || (startTime>=blockedStartTime)){
+            for (const room of rooms) {
+                if (assigned) break;
+    
+                const slot = findNextAvailableSlot(duration, room);
+    
+                if (slot) {
+                    const { dayIndex, startTime, endTime } = slot;
+                    if(dayIndex == blockedDayIndex){
+                        if(blockHour){
+                            if((startTime<=blockedStartTime && blockedStartTime + 60 <= endHour*60) || (startTime>=blockedStartTime)){
+                                schedule.push(`${days[dayIndex]},${minutesToTime(startTime)} - ${minutesToTime(endTime)}: ${courseId} - Room ${room.roomId}`);
+                                if(startTime + 60 < blockedStartTime)
+                                    room.nextAvailableTime = blockedStartTime+60;
+                                else
+                                    room.nextAvailableTime = startTime+duration;
+                                
+                                room.nextAvailableDay = dayIndex;
+                                room.blockedTime = Math.max(room.blockedTime, endTime);
+                                assigned = true;
+                            }
+                        }
+                        else{
                             schedule.push(`${days[dayIndex]},${minutesToTime(startTime)} - ${minutesToTime(endTime)}: ${courseId} - Room ${room.roomId}`);
-                            if(startTime + 60 < blockedStartTime)
-                                room.nextAvailableTime = blockedStartTime+60;
-                            else
-                                room.nextAvailableTime = startTime+duration;
-                            
+                            room.nextAvailableTime = endTime;
                             room.nextAvailableDay = dayIndex;
                             room.blockedTime = Math.max(room.blockedTime, endTime);
                             assigned = true;
@@ -121,21 +134,14 @@ async function assignCoursesToRooms(coursesFilePath, roomsFilePath) {
                         assigned = true;
                     }
                 }
-                else{
-                    schedule.push(`${days[dayIndex]},${minutesToTime(startTime)} - ${minutesToTime(endTime)}: ${courseId} - Room ${room.roomId}`);
-                    room.nextAvailableTime = endTime;
-                    room.nextAvailableDay = dayIndex;
-                    room.blockedTime = Math.max(room.blockedTime, endTime);
-                    assigned = true;
-                }
+    
+              
             }
-
-          
-        }
-
-        if (!assigned) {
-            console.log(`No available time slot found for: ${courseId}`);
-        }
+    
+            if (!assigned) {
+                console.log(`No available time slot found for: ${courseId}`);
+            }
+        }        
     }
 
     return schedule;
