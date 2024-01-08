@@ -57,10 +57,12 @@ async function assignCoursesToRooms(coursesFilePath, roomsFilePath) {
     const coursesLines = await readFileLines(coursesFilePath);
     const roomsLines = await readFileLines(roomsFilePath);
 
-    const rooms = roomsLines.map(line => ({ roomId: line.split(',')[0],roomSize: line.split(',')[1], nextAvailableTime: startHour * 60, nextAvailableDay: 0, blockedTime: Infinity}));
+    let rooms = roomsLines.map(line => ({ roomId: line.split(',')[0],roomSize: line.split(',')[1], nextAvailableTime: startHour * 60, nextAvailableDay: 0, blockedTime: Infinity}));
+    rooms.sort((a, b) => a.roomSize - b.roomSize);
+
     const courseDetails = coursesLines.map(line => ({
         studentId: line.split(',')[0],
-        professorName: line.split(',')[1],
+        professorName: line.split(',')[1], 
         courseId: line.split(',')[2],
         duration: parseInt(line.split(',')[3])
     }));
@@ -92,11 +94,13 @@ async function assignCoursesToRooms(coursesFilePath, roomsFilePath) {
 
     for (const { studentId, professorName, courseId, duration } of courseDetails) {
         if(courses.findIndex(course => course.name === courseId) == -1){
-            courses.push({ name: courseId, count: 1 });
+            courses.push({ name: courseId, count: 1 ,std: [], prof: professorName});
+            courses[courses.length-1].std.push(studentId);
         }
         else{
             let inx = courses.findIndex(course => course.name === courseId);
             courses[inx].count++;
+            courses[inx].std.push(studentId);
         }  
 
     }
@@ -111,11 +115,12 @@ async function assignCoursesToRooms(coursesFilePath, roomsFilePath) {
             tempInx = courses.findIndex(course => course.name === courseId);
             tempSize = courses[tempInx].count;
 
-            if(tempInx == 0)
+            if(tempInx == 0){
                 courses.splice(0,1);
-            else
+            }
+            else{
                 courses.splice(temp,temp);
-
+            }
             let assigned = false;
 
             for (const room of rooms) {
@@ -165,7 +170,7 @@ async function assignCoursesToRooms(coursesFilePath, roomsFilePath) {
             if (!assigned) {
                 console.log(`No available time slot found for: ${courseId}`);
             }
-        }      
+        }   
     }
 
     return schedule;
