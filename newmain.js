@@ -6,6 +6,9 @@ const prompt = require('prompt-sync')({ sigint: true });
 const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
 const startHour = 9; // 9:00 AM
 const endHour = 18; // 6:00 PM
+let blockHourName = 'noBlockedHour';
+let blockedStartTime;
+let blockedMin;
 
 function timeToMinutes(time) {
     const [hour, minute] = time.match(/(\d+):(\d+)/).slice(1, 3);
@@ -15,7 +18,7 @@ function timeToMinutes(time) {
 function minutesToTime(minutes) {
     const hour = Math.floor(minutes / 60) % 24;
     const minute = minutes % 60;
-    return `${hour<10 ? '0'+hour : hour}:${minute === 0 ? '00' : minute}`;
+    return `${hour<10 ? '0'+hour : hour}:${minute === 0 ? '00' : minute < 10 ? '0' + minute:minute}`;
 }
 
 async function readFileLines(filePath) {
@@ -32,117 +35,6 @@ async function readFileLines(filePath) {
     }
 
     return lines.slice(1); // Skip the header line
-}
-
-
-function findNextAvailableSlot(duration, room) {
-    let dayIndex = room.nextAvailableDay;
-    let startTime = room.nextAvailableTime;
-
-    while (dayIndex < 5 % 6) {
-        const endTime = startTime + duration;
-
-        if (startTime >= startHour * 60 && endTime <= endHour*60) {
-            return { dayIndex, startTime, endTime };
-        }
-
-        dayIndex++;
-        startTime = startHour * 60; // Reset start time for the next day
-    }
-
-    return null; // If no suitable slot is found
-}
-
-function objectiveFunction(schedule, courses) {
-    let error = 0;
-    // Check for lecturer conflicts
-    for (let i = 0; i < schedule.length; i++) {
-        for (let j = i + 1; j < schedule.length; j++) {
-            const [day1, time1, course1] = schedule[i].split(',').map(str => str.trim());
-            const [start1, end1] = time1.split(' - ').map(str => str.trim());
-
-            const [day2, time2, course2] = schedule[j].split(',').map(str => str.trim());
-            const [start2, end2] = time2.split(' - ').map(str => str.trim());
-
-            // Convert start and end times to minutes for easier comparison
-            const start1Minutes = timeToMinutes(start1);
-            const end1Minutes = timeToMinutes(end1);
-            const start2Minutes = timeToMinutes(start2);
-            const end2Minutes = timeToMinutes(end2);
-
-            // Check for overlapping intervals
-            if (day1 == day2 && course1 !== course2 && ((start1Minutes < end2Minutes && end1Minutes > start2Minutes) || (start2Minutes < end1Minutes && end2Minutes > start1Minutes))) {
-                error -= 100; // Lecturer conflict penalty
-            }
-        }
-    }
-
-    // Check for student conflicts
-    for (let i = 0; i < schedule.length; i++) {
-        for (let j = i + 1; j < schedule.length; j++) {
-            const [day1, time1, course1] = schedule[i].split(',').map(str => str.trim());
-            const [coursename1, room1] = course1.split(' - ').map(str => str.trim());
-            const [start1, end1] = time1.split(' - ').map(str => str.trim());
-
-            const [day2, time2, course2] = schedule[j].split(',').map(str => str.trim());
-            const [coursename2, room2] = course2.split(' - ').map(str => str.trim());
-            const [start2, end2] = time2.split(' - ').map(str => str.trim());
-           
-            if (coursename1 !== coursename2) {
-                // Check if there's a common student in both courses
-                const commonStudents = courses.find(course => course.name === coursename1).std.filter(student => courses.find(course => course.name === coursename2).std.includes(student));
-                
-                // Check for time overlap for common students
-                for (const student of commonStudents) {
-                    if (time1.includes(student) && time2.includes(student) &&
-                        ((start1 >= start2 && start1 < end2) || (end1 > start2 && end1 <= end2) || (start1 <= start2 && end1 >= end2))) {
-                        error -= 10; // Student conflict penalty
-                    }
-                }
-            }
-        }
-    }
-
-    return error;
-}
-
-function roundNearest5(num) {
-    return Math.round(num / 5) * 5;
-}
-
-async function hillClimbingScheduler(initialSchedule, courses, maxIterations) {
-    let currentSchedule = [...initialSchedule];
-    let currentError = objectiveFunction(currentSchedule, courses);
-
-    if(currentError == 0)
-        return initialSchedule;
-
-    for (let iteration = 0; iteration < maxIterations; iteration++) {
-        let newSchedule = [...currentSchedule];
-        const randomIndex = Math.floor(Math.random() * newSchedule.length);
-
-        // Randomly move one course to a new time slot
-        const [day, time, course] = newSchedule[randomIndex].split(',').map(str => str.trim());
-        const [start, end] = time.split(' - ').map(str => str.trim());
-
-        const newDayIndex = (days.indexOf(day) + Math.floor(Math.random() * 4) + 1) % 5; // Move to a different day
-        const newStartTime = roundNearest5(startHour * 60 + Math.floor(Math.random() * ((endHour - startHour) * 60 - timeToMinutes(end) + timeToMinutes(start))));
-
-        newSchedule[randomIndex] = `${days[newDayIndex]},${minutesToTime(newStartTime)} - ${minutesToTime(newStartTime + timeToMinutes(end) - timeToMinutes(start))},${course}`;
-
-        const newError = objectiveFunction(newSchedule, courses);
-
-        // Move to the new schedule if it reduces the error
-        if (newError > currentError) {
-            currentSchedule = newSchedule;
-            currentError = newError;
-        }
-
-        if(newError == 0)
-            return currentSchedule;
-    }
-
-    return currentSchedule;
 }
 
 async function assignCoursesToRooms(coursesFilePath, roomsFilePath,courses) {
@@ -162,15 +54,15 @@ async function assignCoursesToRooms(coursesFilePath, roomsFilePath,courses) {
     let schedule = [];
 
     let blockedDayIndex = -1;
-    let blockedStartTime
     let flagBlocked
 
     // Block a specific hour
-    const blockHour = prompt('Do you want to block a specific hour? (y/n): ').toLowerCase() === 'y';
-    let blockedDay, blockedTime, blockedMin = 0, blockedName;
+    blockHour = prompt('Do you want to block a specific hour? (y/n): ').toLowerCase() === 'y';
+    let blockedDay, blockedTime, blockedName;
+    blockedMin = 0;
     if (blockHour) {
 
-        flagBlocked = true;
+        flagBlocked = 0;
 
         blockedDay = prompt('Which day? (Example: Tuesday): ');
         blockedTime = prompt('Which hour? (Example: 10:00): ');
@@ -240,11 +132,15 @@ async function assignCoursesToRooms(coursesFilePath, roomsFilePath,courses) {
                                 schedule.push(`${days[dayIndex]},${minutesToTime(startTime)} - ${minutesToTime(endTime)}, ${courseId} - Room ${room.roomId}`);
                                 if(startTime + 60 < blockedStartTime){
                                     room.nextAvailableTime = blockedStartTime+blockedMin;
-                                    schedule.push(`${days[dayIndex]},${minutesToTime(blockedStartTime)} - ${minutesToTime(blockedStartTime+blockedMin)}, ${blockedName} - Room ${room.roomId}`);
-                                    flagBlocked = false;
+                                    let course = { name: blockedName, count: 1, std: [], prof: ''};
+                                    backup.push(course);
+                                    schedule.push(`${days[blockedDayIndex]},${minutesToTime(blockedStartTime)} - ${minutesToTime(blockedStartTime+blockedMin)}, ${blockedName} - Room ${room.roomId}`);  
+                                    blockHourName = blockedName;
+                                    flagBlocked++;                    
                                 }
-                                else
+                                else{
                                     room.nextAvailableTime = startTime+duration;
+                                }
                                 
                                 room.nextAvailableDay = dayIndex;
                                 room.blockedTime = Math.max(room.blockedTime, endTime);
@@ -278,13 +174,156 @@ async function assignCoursesToRooms(coursesFilePath, roomsFilePath,courses) {
         }   
     }
 
-    if(blockHour && flagBlocked){
-        for (const room of rooms) {
-            schedule.push(`${days[blockedDayIndex]},${minutesToTime(blockedStartTime)} - ${minutesToTime(blockedStartTime+blockedMin)}, ${blockedName} - Room ${room.roomId}`);
+    if(blockHour && flagBlocked<rooms.length){
+        for (const room of rooms) { 
+            let course = { name: blockedName, count: 1, std: [], prof: ''};
+            backup.push(course);     
+            blockHourName = blockedName;
+            schedule.push(`${days[blockedDayIndex]},${minutesToTime(blockedStartTime)} - ${minutesToTime(blockedStartTime+blockedMin)}, ${blockedName} - Room ${room.roomId}`); 
+            flagBlocked++;
         }
     }
     
     return schedule;
+}
+
+function findNextAvailableSlot(duration, room) {
+    let dayIndex = room.nextAvailableDay;
+    let startTime = room.nextAvailableTime;
+
+    while (dayIndex < 5 % 6) {
+        const endTime = startTime + duration;
+
+        if (startTime >= startHour * 60 && endTime <= endHour*60) {
+            return { dayIndex, startTime, endTime };
+        }
+
+        dayIndex++;
+        startTime = startHour * 60; // Reset start time for the next day
+    }
+
+    return null; // If no suitable slot is found
+}
+
+function objectiveFunction(schedule, courses) {
+    let error = 0;
+    // Check for lecturer conflicts
+    for (let i = 0; i < schedule.length; i++) {
+        for (let j = i + 1; j < schedule.length; j++) {
+            const [day1, time1, course1] = schedule[i].split(',').map(str => str.trim());
+            const [start1, end1] = time1.split(' - ').map(str => str.trim());
+            const [coursename1, room] = course1.split(' - ').map(str => str.trim());
+
+            const [day2, time2, course2] = schedule[j].split(',').map(str => str.trim());
+            const [start2, end2] = time2.split(' - ').map(str => str.trim());
+            const [coursename2, roo2] = course2.split(' - ').map(str => str.trim());
+
+            // Convert start and end times to minutes for easier comparison
+            const start1Minutes = timeToMinutes(start1);
+            const end1Minutes = timeToMinutes(end1);
+            const start2Minutes = timeToMinutes(start2);
+            const end2Minutes = timeToMinutes(end2);
+
+            if(coursename1 != blockHourName && coursename2 != blockHourName){
+                // Check for overlapping intervals
+                if (day1 == day2 && coursename1 !== coursename2 && ((start1Minutes < end2Minutes && end1Minutes > start2Minutes) || (start2Minutes < end1Minutes && end2Minutes > start1Minutes))) {
+                    error -= 100; // Lecturer conflict penalty
+                }
+            }  
+        }
+    }
+
+    // Check for student conflicts
+    for (let i = 0; i < schedule.length; i++) {
+        for (let j = i + 1; j < schedule.length; j++) {
+            const [day1, time1, course1] = schedule[i].split(',').map(str => str.trim());
+            const [coursename1, room1] = course1.split(' - ').map(str => str.trim());
+            const [start1, end1] = time1.split(' - ').map(str => str.trim());
+
+            const [day2, time2, course2] = schedule[j].split(',').map(str => str.trim());
+            const [coursename2, room2] = course2.split(' - ').map(str => str.trim());
+            const [start2, end2] = time2.split(' - ').map(str => str.trim());
+           
+            if(blockHourName == 'noBlockedHour'){
+                if (coursename1 !== coursename2) {
+                    // Check if there's a common student in both courses
+                    const commonStudents = courses.find(course => course.name === coursename1).std.filter(student => courses.find(course => course.name === coursename2).std.includes(student));
+                    
+                    // Check for time overlap for common students
+                    for (const student of commonStudents) {
+                        if (time1.includes(student) && time2.includes(student) &&
+                            ((start1 >= start2 && start1 < end2) || (end1 > start2 && end1 <= end2) || (start1 <= start2 && end1 >= end2))) {
+                            error -= 10; // Student conflict penalty
+                        }
+                    }
+                }
+            }
+            else{
+                if(coursename1 !== blockHourName && coursename2 !== blockHourName){
+                    if (coursename1 !== coursename2) {
+                        // Check if there's a common student in both courses
+                        const commonStudents = courses.find(course => course.name === coursename1).std.filter(student => courses.find(course => course.name === coursename2).std.includes(student));
+                        
+                        // Check for time overlap for common students
+                        for (const student of commonStudents) {
+                            if (time1.includes(student) && time2.includes(student) &&
+                                ((start1 >= start2 && start1 < end2) || (end1 > start2 && end1 <= end2) || (start1 <= start2 && end1 >= end2))) {
+                                error -= 10; // Student conflict penalty
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    return error;
+}
+
+function roundNearest5(num) {
+    return Math.round(num / 5) * 5;
+}
+
+async function hillClimbingScheduler(initialSchedule, courses, maxIterations) {
+    let currentSchedule = [...initialSchedule];
+    let currentError = objectiveFunction(currentSchedule, courses);
+
+    if(currentError == 0)
+        return initialSchedule;
+
+    for (let iteration = 0; iteration < maxIterations; iteration++) {
+        let newSchedule = [...currentSchedule];
+        const randomIndex = Math.floor(Math.random() * newSchedule.length);
+
+        [coursename1, room] = newSchedule[randomIndex].split(' - ').map(str => str.trim());
+
+        // Randomly move one course to a new time slot
+        while(coursename1 == blockHourName){
+            randomIndex = Math.floor(Math.random() * newSchedule.length);
+            [coursename1, room] = newSchedule[randomIndex].split(' - ').map(str => str.trim());
+        }                                                                                   
+
+        const [day, time, course] = newSchedule[randomIndex].split(',').map(str => str.trim());
+        const [start, end] = time.split(' - ').map(str => str.trim());
+
+        const newDayIndex = (days.indexOf(day) + Math.floor(Math.random() * 4) + 1) % 5; // Move to a different day
+        const newStartTime = roundNearest5(startHour * 60 + Math.floor(Math.random() * ((endHour - startHour) * 60 - timeToMinutes(end) + timeToMinutes(start))));
+
+        newSchedule[randomIndex] = `${days[newDayIndex]},${minutesToTime(newStartTime)} - ${minutesToTime(newStartTime + timeToMinutes(end) - timeToMinutes(start))},${course}`;
+
+        const newError = objectiveFunction(newSchedule, courses);
+
+        // Move to the new schedule if it reduces the error
+        if (newError > currentError) {
+            currentSchedule = newSchedule;
+            currentError = newError;
+        }
+
+        if(newError == 0)
+            return currentSchedule;
+    }
+
+    return currentSchedule;
 }
 
 const coursesFilePath = 'Class_List.csv'; // Courses CSV file path
