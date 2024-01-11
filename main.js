@@ -9,6 +9,7 @@ const endHour = 18; // 6:00 PM
 let blockHourName = 'noBlockedHour';
 let blockedStartTime;
 let blockedMin;
+let blockedDayIndex;
 
 function timeToMinutes(time) {
     const [hour, minute] = time.match(/(\d+):(\d+)/).slice(1, 3);
@@ -53,7 +54,7 @@ async function assignCoursesToRooms(coursesFilePath, roomsFilePath,courses) {
 
     let schedule = [];
 
-    let blockedDayIndex = -1;
+    blockedDayIndex = -1;
     let flagBlocked
 
     // Block a specific hour
@@ -121,7 +122,7 @@ async function assignCoursesToRooms(coursesFilePath, roomsFilePath,courses) {
                     continue;
                 }
     
-                const slot = await findNextAvailableSlot(duration, room);
+                const slot = findNextAvailableSlot(duration, room);
     
                 if (slot) {
                     const { dayIndex, startTime, endTime } = slot;
@@ -176,10 +177,12 @@ async function assignCoursesToRooms(coursesFilePath, roomsFilePath,courses) {
 
     if(blockHour && flagBlocked<rooms.length){
         for (const room of rooms) { 
-            let course = { name: blockedName, count: 1, std: [], prof: ''};
-            backup.push(course);     
-            blockHourName = blockedName;
-            schedule.push(`${days[blockedDayIndex]},${minutesToTime(blockedStartTime)} - ${minutesToTime(blockedStartTime+blockedMin)}, ${blockedName} - Room ${room.roomId}`); 
+            if(schedule.indexOf(`${days[blockedDayIndex]},${minutesToTime(blockedStartTime)} - ${minutesToTime(blockedStartTime+blockedMin)}, ${blockedName} - Room ${room.roomId}`) == -1){
+                let course = { name: blockedName, count: 1, std: [], prof: ''};
+                backup.push(course);     
+                blockHourName = blockedName;
+                schedule.push(`${days[blockedDayIndex]},${minutesToTime(blockedStartTime)} - ${minutesToTime(blockedStartTime+blockedMin)}, ${blockedName} - Room ${room.roomId}`); 
+            }
             flagBlocked++;
         }
     }
@@ -277,6 +280,33 @@ function objectiveFunction(schedule, courses) {
         }
     }
 
+    // Checking blocked hours
+    if(blockedDayIndex != -1){
+        for (let i = 0; i < schedule.length; i++) {
+            for (let j = i + 1; j < schedule.length; j++) {
+                const [day1, time1, course1] = schedule[i].split(',').map(str => str.trim());
+                const [start1, end1] = time1.split(' - ').map(str => str.trim());
+                const [coursename1, room] = course1.split(' - ').map(str => str.trim());
+    
+                const [day2, time2, course2] = schedule[j].split(',').map(str => str.trim());
+                const [start2, end2] = time2.split(' - ').map(str => str.trim());
+                const [coursename2, roo2] = course2.split(' - ').map(str => str.trim());
+    
+                // Convert start and end times to minutes for easier comparison
+                const start1Minutes = timeToMinutes(start1);
+                const end1Minutes = timeToMinutes(end1);
+                const start2Minutes = timeToMinutes(start2);
+                const end2Minutes = timeToMinutes(end2);
+    
+                if((coursename1 == blockHourName && coursename2 != blockHourName) || (coursename1 != blockHourName && coursename2 == blockHourName)){
+                    // Check for overlapping intervals
+                    if (day1 == day2 && coursename1 !== coursename2 && ((start1Minutes < end2Minutes && end1Minutes > start2Minutes) || (start2Minutes < end1Minutes && end2Minutes > start1Minutes))) {
+                        error -= 500; // Blocked hour conflict penalty
+                    }
+                }  
+            }
+        }
+    }
     return error;
 }
 
@@ -317,10 +347,14 @@ async function hillClimbingScheduler(initialSchedule, courses, maxIterations) {
         if (newError > currentError) {
             currentSchedule = newSchedule;
             currentError = newError;
+            console.log(currentError+ ' ' + iteration);
         }
 
-        if(newError == 0)
+        if(newError == 0){
+            console.log(newError + ' ' + iteration);
             return currentSchedule;
+        }
+            
     }
 
     return currentSchedule;
@@ -381,10 +415,9 @@ var backup;
           }
     )
     .forEach(entry => console.log(entry));
-    
+
     //To write schedules to csv file
     const outputFilePath = 'Exam_schedule.csv';
     const outputData = optimizedSchedule.join('\n');
     fs.writeFileSync(outputFilePath, outputData, 'utf-8');
-
 })();
