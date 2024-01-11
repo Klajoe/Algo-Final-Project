@@ -381,4 +381,10 @@ var backup;
           }
     )
     .forEach(entry => console.log(entry));
+    
+    //To write schedules to csv file
+    const outputFilePath = 'Exam_schedule.csv';
+    const outputData = optimizedSchedule.join('\n');
+    fs.writeFileSync(outputFilePath, outputData, 'utf-8');
+
 })();
