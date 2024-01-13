@@ -3,7 +3,7 @@ const readline = require('readline');
 const { scheduler } = require('timers/promises');
 const prompt = require('prompt-sync')({ sigint: true });
 
-const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
+const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 const startHour = 9; // 9:00 AM
 const endHour = 18; // 6:00 PM
 let blockHourName = 'noBlockedHour';
@@ -19,7 +19,7 @@ function timeToMinutes(time) {
 function minutesToTime(minutes) {
     const hour = Math.floor(minutes / 60) % 24;
     const minute = minutes % 60;
-    return `${hour<10 ? '0'+hour : hour}:${minute === 0 ? '00' : minute < 10 ? '0' + minute:minute}`;
+    return `${hour < 10 ? '0' + hour : hour}:${minute === 0 ? '00' : minute < 10 ? '0' + minute : minute}`;
 }
 
 async function readFileLines(filePath) {
@@ -38,16 +38,16 @@ async function readFileLines(filePath) {
     return lines.slice(1); // Skip the header line
 }
 
-async function assignCoursesToRooms(coursesFilePath, roomsFilePath,courses) {
+async function assignCoursesToRooms(coursesFilePath, roomsFilePath, courses) {
     const coursesLines = await readFileLines(coursesFilePath);
     const roomsLines = await readFileLines(roomsFilePath);
 
-    let rooms = roomsLines.map(line => ({ roomId: line.split(',')[0],roomSize: line.split(',')[1], nextAvailableTime: startHour * 60, nextAvailableDay: 0, blockedTime: Infinity}));
+    let rooms = roomsLines.map(line => ({ roomId: line.split(',')[0], roomSize: line.split(',')[1], nextAvailableTime: startHour * 60, nextAvailableDay: 0, blockedTime: Infinity }));
     rooms.sort((a, b) => a.roomSize - b.roomSize);
 
     const courseDetails = coursesLines.map(line => ({
         studentId: line.split(',')[0],
-        professorName: line.split(',')[1], 
+        professorName: line.split(',')[1],
         courseId: line.split(',')[2],
         duration: parseInt(line.split(',')[3])
     }));
@@ -86,7 +86,7 @@ async function assignCoursesToRooms(coursesFilePath, roomsFilePath,courses) {
 
     for (const { studentId, professorName, courseId, duration } of courseDetails) {
         let course = courses.find(c => c.name === courseId);
-        
+
         if (!course) {
             course = { name: courseId, count: 1, std: [], prof: professorName };
             courses.push(course);
@@ -99,18 +99,18 @@ async function assignCoursesToRooms(coursesFilePath, roomsFilePath,courses) {
     backup = JSON.parse(JSON.stringify(courses));
 
     for (const { studentId, professorName, courseId, duration } of courseDetails) {
-        
-        let tempInx,tempSize;
 
-        if(courses.findIndex(course => course.name === courseId) != -1){
+        let tempInx, tempSize;
+
+        if (courses.findIndex(course => course.name === courseId) != -1) {
             tempInx = courses.findIndex(course => course.name === courseId);
             tempSize = courses[tempInx].count;
 
-            if(tempInx == 0){
-                courses.splice(0,1);
+            if (tempInx == 0) {
+                courses.splice(0, 1);
             }
-            else{
-                courses.splice(tempInx,tempInx);
+            else {
+                courses.splice(tempInx, tempInx);
                 return;
             }
             let assigned = false;
@@ -118,37 +118,37 @@ async function assignCoursesToRooms(coursesFilePath, roomsFilePath,courses) {
             for (const room of rooms) {
                 if (assigned) break;
 
-                if(room.roomSize/2<tempSize){
+                if (room.roomSize / 2 < tempSize) {
                     continue;
                 }
-    
+
                 const slot = findNextAvailableSlot(duration, room);
-    
+
                 if (slot) {
                     const { dayIndex, startTime, endTime } = slot;
-                    
-                    if(dayIndex == blockedDayIndex){
-                        if(blockHour){
-                            if((startTime<=blockedStartTime && blockedStartTime + blockedMin <= endHour*60) || (startTime>=blockedStartTime)){
+
+                    if (dayIndex == blockedDayIndex) {
+                        if (blockHour) {
+                            if ((startTime <= blockedStartTime && blockedStartTime + blockedMin <= endHour * 60) || (startTime >= blockedStartTime)) {
                                 schedule.push(`${days[dayIndex]},${minutesToTime(startTime)} - ${minutesToTime(endTime)}, ${courseId} - Room ${room.roomId}`);
-                                if(startTime + 60 < blockedStartTime){
-                                    room.nextAvailableTime = blockedStartTime+blockedMin;
-                                    let course = { name: blockedName, count: 1, std: [], prof: ''};
+                                if (startTime + 60 < blockedStartTime) {
+                                    room.nextAvailableTime = blockedStartTime + blockedMin;
+                                    let course = { name: blockedName, count: 1, std: [], prof: '' };
                                     backup.push(course);
-                                    schedule.push(`${days[blockedDayIndex]},${minutesToTime(blockedStartTime)} - ${minutesToTime(blockedStartTime+blockedMin)}, ${blockedName} - Room ${room.roomId}`);  
+                                    schedule.push(`${days[blockedDayIndex]},${minutesToTime(blockedStartTime)} - ${minutesToTime(blockedStartTime + blockedMin)}, ${blockedName} - Room ${room.roomId}`);
                                     blockHourName = blockedName;
-                                    flagBlocked++;                    
+                                    flagBlocked++;
                                 }
-                                else{
-                                    room.nextAvailableTime = startTime+duration;
+                                else {
+                                    room.nextAvailableTime = startTime + duration;
                                 }
-                                
+
                                 room.nextAvailableDay = dayIndex;
                                 room.blockedTime = Math.max(room.blockedTime, endTime);
                                 assigned = true;
                             }
                         }
-                        else{
+                        else {
                             schedule.push(`${days[dayIndex]},${minutesToTime(startTime)} - ${minutesToTime(endTime)}, ${courseId} - Room ${room.roomId}`);
                             room.nextAvailableTime = endTime;
                             room.nextAvailableDay = dayIndex;
@@ -156,37 +156,37 @@ async function assignCoursesToRooms(coursesFilePath, roomsFilePath,courses) {
                             assigned = true;
                         }
                     }
-                    else{
+                    else {
                         schedule.push(`${days[dayIndex]},${minutesToTime(startTime)} - ${minutesToTime(endTime)}, ${courseId} - Room ${room.roomId}`);
-                        
+
                         room.nextAvailableTime = endTime;
                         room.nextAvailableDay = dayIndex;
                         room.blockedTime = Math.max(room.blockedTime, endTime);
                         assigned = true;
                     }
                 }
-    
+
             }
-    
+
             if (!assigned) {
                 console.log(`No available time slot found for: ${courseId}`);
             }
 
-        }   
+        }
     }
 
-    if(blockHour && flagBlocked<rooms.length){
-        for (const room of rooms) { 
-            if(schedule.indexOf(`${days[blockedDayIndex]},${minutesToTime(blockedStartTime)} - ${minutesToTime(blockedStartTime+blockedMin)}, ${blockedName} - Room ${room.roomId}`) == -1){
-                let course = { name: blockedName, count: 1, std: [], prof: ''};
-                backup.push(course);     
+    if (blockHour && flagBlocked < rooms.length) {
+        for (const room of rooms) {
+            if (schedule.indexOf(`${days[blockedDayIndex]},${minutesToTime(blockedStartTime)} - ${minutesToTime(blockedStartTime + blockedMin)}, ${blockedName} - Room ${room.roomId}`) == -1) {
+                let course = { name: blockedName, count: 1, std: [], prof: '' };
+                backup.push(course);
                 blockHourName = blockedName;
-                schedule.push(`${days[blockedDayIndex]},${minutesToTime(blockedStartTime)} - ${minutesToTime(blockedStartTime+blockedMin)}, ${blockedName} - Room ${room.roomId}`); 
+                schedule.push(`${days[blockedDayIndex]},${minutesToTime(blockedStartTime)} - ${minutesToTime(blockedStartTime + blockedMin)}, ${blockedName} - Room ${room.roomId}`);
             }
             flagBlocked++;
         }
     }
-    
+
     return schedule;
 }
 
@@ -194,10 +194,10 @@ function findNextAvailableSlot(duration, room) {
     let dayIndex = room.nextAvailableDay;
     let startTime = room.nextAvailableTime;
 
-    while (dayIndex < 5 % 6) {
+    while (dayIndex < 6 % 7) {
         const endTime = startTime + duration;
 
-        if (startTime >= startHour * 60 && endTime <= endHour*60) {
+        if (startTime >= startHour * 60 && endTime <= endHour * 60) {
             return { dayIndex, startTime, endTime };
         }
 
@@ -227,12 +227,12 @@ function objectiveFunction(schedule, courses) {
             const start2Minutes = timeToMinutes(start2);
             const end2Minutes = timeToMinutes(end2);
 
-            if(coursename1 != blockHourName && coursename2 != blockHourName){
+            if (coursename1 != blockHourName && coursename2 != blockHourName) {
                 // Check for overlapping intervals
                 if (day1 == day2 && coursename1 !== coursename2 && ((start1Minutes < end2Minutes && end1Minutes > start2Minutes) || (start2Minutes < end1Minutes && end2Minutes > start1Minutes))) {
                     error -= 100; // Lecturer conflict penalty
                 }
-            }  
+            }
         }
     }
 
@@ -246,12 +246,12 @@ function objectiveFunction(schedule, courses) {
             const [day2, time2, course2] = schedule[j].split(',').map(str => str.trim());
             const [coursename2, room2] = course2.split(' - ').map(str => str.trim());
             const [start2, end2] = time2.split(' - ').map(str => str.trim());
-           
-            if(blockHourName == 'noBlockedHour'){
+
+            if (blockHourName == 'noBlockedHour') {
                 if (coursename1 !== coursename2) {
                     // Check if there's a common student in both courses
                     const commonStudents = courses.find(course => course.name === coursename1).std.filter(student => courses.find(course => course.name === coursename2).std.includes(student));
-                    
+
                     // Check for time overlap for common students
                     for (const student of commonStudents) {
                         if (time1.includes(student) && time2.includes(student) &&
@@ -261,12 +261,12 @@ function objectiveFunction(schedule, courses) {
                     }
                 }
             }
-            else{
-                if(coursename1 !== blockHourName && coursename2 !== blockHourName){
+            else {
+                if (coursename1 !== blockHourName && coursename2 !== blockHourName) {
                     if (coursename1 !== coursename2) {
                         // Check if there's a common student in both courses
                         const commonStudents = courses.find(course => course.name === coursename1).std.filter(student => courses.find(course => course.name === coursename2).std.includes(student));
-                        
+
                         // Check for time overlap for common students
                         for (const student of commonStudents) {
                             if (time1.includes(student) && time2.includes(student) &&
@@ -281,29 +281,42 @@ function objectiveFunction(schedule, courses) {
     }
 
     // Checking blocked hours
-    if(blockedDayIndex != -1){
+    if (blockedDayIndex != -1) {
         for (let i = 0; i < schedule.length; i++) {
             for (let j = i + 1; j < schedule.length; j++) {
                 const [day1, time1, course1] = schedule[i].split(',').map(str => str.trim());
                 const [start1, end1] = time1.split(' - ').map(str => str.trim());
                 const [coursename1, room] = course1.split(' - ').map(str => str.trim());
-    
+
                 const [day2, time2, course2] = schedule[j].split(',').map(str => str.trim());
                 const [start2, end2] = time2.split(' - ').map(str => str.trim());
                 const [coursename2, roo2] = course2.split(' - ').map(str => str.trim());
-    
+
                 // Convert start and end times to minutes for easier comparison
                 const start1Minutes = timeToMinutes(start1);
                 const end1Minutes = timeToMinutes(end1);
                 const start2Minutes = timeToMinutes(start2);
                 const end2Minutes = timeToMinutes(end2);
-    
-                if((coursename1 == blockHourName && coursename2 != blockHourName) || (coursename1 != blockHourName && coursename2 == blockHourName)){
+
+                if ((coursename1 == blockHourName && coursename2 != blockHourName) || (coursename1 != blockHourName && coursename2 == blockHourName)) {
                     // Check for overlapping intervals
                     if (day1 == day2 && coursename1 !== coursename2 && ((start1Minutes < end2Minutes && end1Minutes > start2Minutes) || (start2Minutes < end1Minutes && end2Minutes > start1Minutes))) {
                         error -= 500; // Blocked hour conflict penalty
                     }
-                }  
+                }
+
+                if (blockHourName != 'noBlockedHour') {
+                    if (coursename1 == blockHourName) {
+                        if (day1 == blockHourName && start1Minutes === blockedStartTime) {
+                            error -= 500; // Blocked hour conflict penalty
+                        }
+                    } else if (coursename2 == blockHourName) {
+                        if (day2 == blockHourName && start2Minutes == blockedStartTime) {
+                            error -= 500; // Blocked hour conflict penalty
+                        }
+                    }
+                }
+                
             }
         }
     }
@@ -318,7 +331,7 @@ async function hillClimbingScheduler(initialSchedule, courses, maxIterations) {
     let currentSchedule = [...initialSchedule];
     let currentError = objectiveFunction(currentSchedule, courses);
 
-    if(currentError == 0)
+    if (currentError == 0)
         return initialSchedule;
 
     for (let iteration = 0; iteration < maxIterations; iteration++) {
@@ -328,15 +341,15 @@ async function hillClimbingScheduler(initialSchedule, courses, maxIterations) {
         [coursename1, room] = newSchedule[randomIndex].split(' - ').map(str => str.trim());
 
         // Randomly move one course to a new time slot
-        while(coursename1 == blockHourName){
+        while (coursename1 == blockHourName) {
             randomIndex = Math.floor(Math.random() * newSchedule.length);
             [coursename1, room] = newSchedule[randomIndex].split(' - ').map(str => str.trim());
-        }                                                                                   
+        }
 
         const [day, time, course] = newSchedule[randomIndex].split(',').map(str => str.trim());
         const [start, end] = time.split(' - ').map(str => str.trim());
 
-        const newDayIndex = (days.indexOf(day) + Math.floor(Math.random() * 4) + 1) % 5; // Move to a different day
+        const newDayIndex = (days.indexOf(day) + Math.floor(Math.random() * 4) + 1) % 6; // Move to a different day
         const newStartTime = roundNearest5(startHour * 60 + Math.floor(Math.random() * ((endHour - startHour) * 60 - timeToMinutes(end) + timeToMinutes(start))));
 
         newSchedule[randomIndex] = `${days[newDayIndex]},${minutesToTime(newStartTime)} - ${minutesToTime(newStartTime + timeToMinutes(end) - timeToMinutes(start))},${course}`;
@@ -347,14 +360,14 @@ async function hillClimbingScheduler(initialSchedule, courses, maxIterations) {
         if (newError > currentError) {
             currentSchedule = newSchedule;
             currentError = newError;
-            console.log(currentError+ ' ' + iteration);
+            console.log(currentError + ' ' + iteration);
         }
 
-        if(newError == 0){
+        if (newError == 0) {
             console.log(newError + ' ' + iteration);
             return currentSchedule;
         }
-            
+
     }
 
     return currentSchedule;
@@ -374,47 +387,47 @@ var backup;
             const nameA = a.split(',')[1].split(' - ')[0] // ignore upper and lowercase
             const nameB = b.split(',')[1].split(' - ')[0] // ignore upper and lowercase
             if (nameA < nameB) {
-              return -1;
+                return -1;
             }
             if (nameA > nameB) {
-              return 1;
+                return 1;
             }
-          
+
             // names must be equal
             return 0;
-          }
+        }
     )
-    .sort(
-        (a, b) => {
-            const nameA = a.split(',')[2].split(' - ')[1] // ignore upper and lowercase
-            const nameB = b.split(',')[2].split(' - ')[1] // ignore upper and lowercase
-            if (nameA < nameB) {
-              return -1;
+        .sort(
+            (a, b) => {
+                const nameA = a.split(',')[2].split(' - ')[1] // ignore upper and lowercase
+                const nameB = b.split(',')[2].split(' - ')[1] // ignore upper and lowercase
+                if (nameA < nameB) {
+                    return -1;
+                }
+                if (nameA > nameB) {
+                    return 1;
+                }
+
+                // names must be equal
+                return 0;
             }
-            if (nameA > nameB) {
-              return 1;
+        )
+        .sort(
+            (a, b) => {
+                const nameA = a.split(',')[0] // ignore upper and lowercase
+                const nameB = b.split(',')[0] // ignore upper and lowercase
+                if (days.indexOf(nameA) < days.indexOf(nameB)) {
+                    return -1;
+                }
+                if (days.indexOf(nameA) > days.indexOf(nameB)) {
+                    return 1;
+                }
+
+                // names must be equal
+                return 0;
             }
-          
-            // names must be equal
-            return 0;
-          }
-    )
-    .sort(
-        (a, b) => {
-            const nameA = a.split(',')[0] // ignore upper and lowercase
-            const nameB = b.split(',')[0] // ignore upper and lowercase
-            if (days.indexOf(nameA) < days.indexOf(nameB)) {
-              return -1;
-            }
-            if (days.indexOf(nameA) > days.indexOf(nameB)) {
-              return 1;
-            }
-          
-            // names must be equal
-            return 0;
-          }
-    )
-    .forEach(entry => console.log(entry));
+        )
+        .forEach(entry => console.log(entry));
 
     //To write schedules to csv file
     const outputFilePath = 'Exam_schedule.csv';
