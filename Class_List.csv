@@ -62,3 +62,93 @@ StudentID,ProfessorName,CourseID,ExamDuration
 1021,Carol White,PSYCH202,60
 1022,Carol White,PSYCH202,60
 1023,Carol White,PSYCH202,60
+1025,David Green,CENG303,90
+1026,David Green,CENG303,90
+1027,David Green,CENG303,90
+1028,David Green,CENG303,90
+1025,Harry Dean,CENG305,90
+1026,Harry Dean,CENG305,90
+1028,Harry Dean,CENG305,90
+1029,Harry Dean,CENG305,90
+1029,Melek Aksoy,CENG307,60
+1030,Melek Aksoy,CENG307,60
+1031,Melek Aksoy,CENG307,60
+1032,Melek Aksoy,CENG307,60
+1025,Ece Yilmaz,CENG309,60
+1026,Ece Yilmaz,CENG309,60
+1027,Ece Yilmaz,CENG309,60
+1028,Ece Yilmaz,CENG309,60
+1029,Ece Yilmaz,CENG309,60
+1032,Ece Yilmaz,CENG309,60
+1033,Ece Yilmaz,CENG309,60
+1029,Evren Aykac,CENG427,120
+1030,Evren Aykac,CENG427,120
+1031,Evren Aykac,CENG427,120
+1032,Evren Aykac,CENG427,120
+1033,Evren Aykac,CENG427,120
+1034,Evren Aykac,CENG427,120
+1031,Fadi Yilmaz,CENG325,90
+1032,Fadi Yilmaz,CENG325,90
+1033,Fadi Yilmaz,CENG325,90
+1034,Fadi Yilmaz,CENG325,90
+1035,Fadi Yilmaz,CENG325,90
+1024,Fadi Yilmaz,CENG325,90
+1032,Marry Jane,CENG327,60
+1033,Marry Jane,CENG327,60
+1034,Marry Jane,CENG327,60
+1035,Marry Jane,CENG327,60
+1036,Marry Jane,CENG327,60
+1032,Marry Jane,ENGR404,60
+1033,Marry Jane,ENGR404,60
+1034,Marry Jane,ENGR404,60
+1035,Marry Jane,ENGR404,60
+1036,Marry Jane,ENGR404,60
+1035,Fadi Yilmaz,UE404,90
+1036,Fadi Yilmaz,UE404,90
+1037,Fadi Yilmaz,UE404,90
+1038,Fadi Yilmaz,UE404,90
+1039,Fadi Yilmaz,UE404,90
+1037,Evren Aykac,UE406,60
+1038,Evren Aykac,UE406,60
+1039,Evren Aykac,UE406,60
+1040,Evren Aykac,UE406,60
+1041,Evren Aykac,UE406,60
+1042,Mustain Billah,LAW101,120
+1043,Mustain Billah,LAW101,120
+1044,Mustain Billah,LAW101,120
+1045,Mustain Billah,LAW101,120
+1046,Mustain Billah,LAW101,120
+1042,Mehmet Okan Tekman,LAW102,90
+1043,Mehmet Okan Tekman,LAW102,90
+1044,Mehmet Okan Tekman,LAW102,90
+1045,Mehmet Okan Tekman,LAW102,90
+1043,Mehmet Okan Tekman,LAW201,60
+1044,Mehmet Okan Tekman,LAW201,60
+1045,Mehmet Okan Tekman,LAW201,60
+1046,Mehmet Okan Tekman,LAW201,60
+1047,Mehmet Okan Tekman,LAW201,60
+1048,Mehmet Okan Tekman,LAW201,60
+1049,Mehmet Okan Tekman,LAW201,60
+1046,Ilkkan Eray,ECON101,120
+1047,Ilkkan Eray,ECON101,120
+1048,Ilkkan Eray,ECON101,120
+1049,Ilkkan Eray,ECON101,120
+1050,Ilkkan Eray,ECON101,120
+1046,Ilkkan Eray,ECON102,120   
+1048,Ilkkan Eray,ECON102,120
+1049,Ilkkan Eray,ECON102,120
+1051,Nilgün Marmara,LITER101,90
+1052,Nilgün Marmara,LITER101,90
+1053,Nilgün Marmara,LITER101,90
+1052,Nilgün Marmara,LITER102,60
+1053,Nilgün Marmara,LITER102,60
+1054,Nilgün Marmara,LITER102,60
+1055,Nilgün Marmara,LITER102,60
+1056,Nilgün Marmara,LITER102,60
+1051,Sait Faik,HIST101,60
+1052,Sait Faik,HIST101,60
+1053,Sait Faik,HIST101,60
+1053,Sait Faik,HIST102,60
+1055,Sait Faik,HIST102,60
+1056,Sait Faik,HIST102,60
+1057,Sait Faik,HIST102,60
