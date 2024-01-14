@@ -6,6 +6,7 @@ const prompt = require('prompt-sync')({ sigint: true });
 const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 const startHour = 9; // 9:00 AM
 const endHour = 18; // 6:00 PM
+
 let blockHourName = 'noBlockedHour';
 let blockedStartTime;
 let blockedMin;
@@ -113,12 +114,15 @@ async function assignCoursesToRooms(coursesFilePath, roomsFilePath, courses) {
                 courses.splice(tempInx, tempInx);
                 return;
             }
+            
             let assigned = false;
 
             for (const room of rooms) {
-                if (assigned) break;
+                if (assigned) {
+                    break;
+                }
 
-                if (room.roomSize / 2 < tempSize) {
+                if (room.roomSize / rooms.length < tempSize) { // rooms.length for the access to all rooms
                     continue;
                 }
 
@@ -158,7 +162,6 @@ async function assignCoursesToRooms(coursesFilePath, roomsFilePath, courses) {
                     }
                     else {
                         schedule.push(`${days[dayIndex]},${minutesToTime(startTime)} - ${minutesToTime(endTime)}, ${courseId} - Room ${room.roomId}`);
-
                         room.nextAvailableTime = endTime;
                         room.nextAvailableDay = dayIndex;
                         room.blockedTime = Math.max(room.blockedTime, endTime);
@@ -194,7 +197,7 @@ function findNextAvailableSlot(duration, room) {
     let dayIndex = room.nextAvailableDay;
     let startTime = room.nextAvailableTime;
 
-    while (dayIndex < 6 % 7) {
+    while (dayIndex < days.length % (days.length+1)) {
         const endTime = startTime + duration;
 
         if (startTime >= startHour * 60 && endTime <= endHour * 60) {
@@ -331,10 +334,13 @@ async function hillClimbingScheduler(initialSchedule, courses, maxIterations) {
     let currentSchedule = [...initialSchedule];
     let currentError = objectiveFunction(currentSchedule, courses);
 
+    let errorStuckCounter = 0;
+    let maxiterations = maxIterations;
+
     if (currentError == 0)
         return initialSchedule;
 
-    for (let iteration = 0; iteration < maxIterations; iteration++) {
+    for (let iteration = 0; iteration < maxiterations; iteration++) {
         let newSchedule = [...currentSchedule];
         const randomIndex = Math.floor(Math.random() * newSchedule.length);
 
@@ -349,12 +355,16 @@ async function hillClimbingScheduler(initialSchedule, courses, maxIterations) {
         const [day, time, course] = newSchedule[randomIndex].split(',').map(str => str.trim());
         const [start, end] = time.split(' - ').map(str => str.trim());
 
-        const newDayIndex = (days.indexOf(day) + Math.floor(Math.random() * 4) + 1) % 6; // Move to a different day
+        const newDayIndex = (days.indexOf(day) + Math.floor(Math.random() * 4) + 1) % days.length; // Move to a different day
         const newStartTime = roundNearest5(startHour * 60 + Math.floor(Math.random() * ((endHour - startHour) * 60 - timeToMinutes(end) + timeToMinutes(start))));
 
         newSchedule[randomIndex] = `${days[newDayIndex]},${minutesToTime(newStartTime)} - ${minutesToTime(newStartTime + timeToMinutes(end) - timeToMinutes(start))},${course}`;
 
         const newError = objectiveFunction(newSchedule, courses);
+
+        if (currentError === newError) {
+            errorStuckCounter++;
+        }
 
         // Move to the new schedule if it reduces the error
         if (newError > currentError) {
@@ -368,6 +378,12 @@ async function hillClimbingScheduler(initialSchedule, courses, maxIterations) {
             return currentSchedule;
         }
 
+        if (errorStuckCounter > 100 && days.length == 6) {
+            errorStuckCounter = 0;
+            console.log("Schedule can not created with 6 days, 7th day added to the scheule.");
+            days.push('Sunday');
+            maxiterations += maxiterations / 2;
+        }
     }
 
     return currentSchedule;
@@ -397,40 +413,38 @@ var backup;
             return 0;
         }
     )
-        .sort(
-            (a, b) => {
-                const nameA = a.split(',')[2].split(' - ')[1] // ignore upper and lowercase
-                const nameB = b.split(',')[2].split(' - ')[1] // ignore upper and lowercase
-                if (nameA < nameB) {
-                    return -1;
-                }
-                if (nameA > nameB) {
-                    return 1;
-                }
-
-                // names must be equal
-                return 0;
+    .sort(
+        (a, b) => {
+            const nameA = a.split(',')[2].split(' - ')[1] // ignore upper and lowercase
+            const nameB = b.split(',')[2].split(' - ')[1] // ignore upper and lowercase
+            if (nameA < nameB) {
+                return -1;
             }
-        )
-        .sort(
-            (a, b) => {
-                const nameA = a.split(',')[0] // ignore upper and lowercase
-                const nameB = b.split(',')[0] // ignore upper and lowercase
-                if (days.indexOf(nameA) < days.indexOf(nameB)) {
-                    return -1;
-                }
-                if (days.indexOf(nameA) > days.indexOf(nameB)) {
-                    return 1;
-                }
-
-                // names must be equal
-                return 0;
+            if (nameA > nameB) {
+                return 1;
             }
-        )
-        .forEach(entry => console.log(entry));
+            // names must be equal
+            return 0;
+        }
+    )
+    .sort(
+        (a, b) => {
+            const nameA = a.split(',')[0] // ignore upper and lowercase
+            const nameB = b.split(',')[0] // ignore upper and lowercase
+            if (days.indexOf(nameA) < days.indexOf(nameB)) {
+                return -1;
+            }
+            if (days.indexOf(nameA) > days.indexOf(nameB)) {
+                return 1;
+            }
 
-    //To write schedules to csv file
-    const outputFilePath = 'Exam_schedule.csv';
+            // names must be equal
+            return 0;
+        }
+    )
+    .forEach(entry => console.log(entry));
+
+    // Write schedule to csv file
     const outputData = optimizedSchedule.join('\n');
-    fs.writeFileSync(outputFilePath, outputData, 'utf-8');
+    fs.writeFileSync('Exam_Schedule.csv', outputData, 'utf-8');
 })();
