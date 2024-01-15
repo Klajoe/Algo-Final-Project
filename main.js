@@ -11,6 +11,7 @@ let blockHourName = 'noBlockedHour';
 let blockedStartTime;
 let blockedMin;
 let blockedDayIndex;
+let notAssaignedCourseExist = false;
 
 function timeToMinutes(time){
     const [hour, minute] = time.match(/(\d+):(\d+)/).slice(1, 3);
@@ -38,7 +39,7 @@ async function readFileLines(filePath){
     return lines.slice(1);
 }
 
-async function assignCoursesToRooms(coursesFilePath, roomsFilePath, courses){
+async function assignCoursesToRooms(coursesFilePath, roomsFilePath, courses) {
     const coursesLines = await readFileLines(coursesFilePath);
     const roomsLines = await readFileLines(roomsFilePath);
 
@@ -162,11 +163,12 @@ async function assignCoursesToRooms(coursesFilePath, roomsFilePath, courses){
 
             }
 
-            if(!assigned)
-                console.log(`No available time slot found for: ${courseId}`);
-
+            if(!assigned) {
+                notAssaignedCourseExist = true;
+            }
         }
     }
+
     //assigning the block hour
     if(blockHour && flagBlocked<rooms.length){
         for(const room of rooms){ 
@@ -235,8 +237,8 @@ function objectiveFunction(schedule, courses){
             const [coursename2, room2] = course2.split(' - ').map(str => str.trim());
             const [start2, end2] = time2.split(' - ').map(str => str.trim());
 
-            if(blockHourName == 'noBlockedHour'){
-                if(coursename1 !== coursename2){
+            if(blockHourName == 'noBlockedHour') {
+                if(coursename1 !== coursename2) {
                     const commonStudents = courses.find(course => course.name === coursename1).std.filter(student => courses.find(course => course.name === coursename2).std.includes(student));
                     for (const student of commonStudents) {
                         if(time1.includes(student) && time2.includes(student) &&
@@ -245,7 +247,7 @@ function objectiveFunction(schedule, courses){
                     }
                 }
             }
-            else{
+            else {
                 if(coursename1 !== blockHourName && coursename2 !== blockHourName){
                     if(coursename1 !== coursename2){
                         // Check if there's a common student in both courses
@@ -338,41 +340,45 @@ async function hillClimbingScheduler(initialSchedule, courses, maxIterations){
 
         const newError = objectiveFunction(newSchedule, courses);
 
-        if(currentError === newError)
+        if(currentError === newError) {
             errorStuckCounter++;
+        }
 
         if(newError > currentError){
             currentSchedule = newSchedule;
             currentError = newError;
-            //console.log(currentError + ' ' + iteration);
         }
         if(newError == 0){
-            //console.log(newError + ' ' + iteration);
             return currentSchedule;
         }
-        if(errorStuckCounter > 100 && days.length == 6){
+        if(errorStuckCounter > 200){
             errorStuckCounter = 0;
-            //console.log("Schedule can not created with 6 days, 7th day added to the schedule.");
-            days.push('Sunday');
+            if (days.length == 6) {
+                days.push('Sunday');
+            }
             maxiterations += maxiterations / 2;
         }
     }
     return currentSchedule;
 }
 
-const coursesFilePath = 'Class_List.csv'; 
-const roomsFilePath = 'Classroom_Capacities.csv'; 
+const coursesFilePath = 'Class_List.csv';
+const roomsFilePath = 'Classroom_Capacities.csv';
 var courses = [];
 var backup;
 
 
 (async () => {
     const initialSchedule = await assignCoursesToRooms(coursesFilePath, roomsFilePath, courses);
+    if (notAssaignedCourseExist) { // If scheduling is not possible, add an extra day
+        days.push('Sunday');
+        initialSchedule = await assignCoursesToRooms(coursesFilePath, roomsFilePath, courses);
+    }
     const optimizedSchedule = await hillClimbingScheduler(initialSchedule, backup, 1000);
     optimizedSchedule.sort(
         (a, b) => {
             const nameA = a.split(',')[1].split(' - ')[0]
-            const nameB = b.split(',')[1].split(' - ')[0] 
+            const nameB = b.split(',')[1].split(' - ')[0]
             if(nameA < nameB)
                 return -1;
 
@@ -410,7 +416,7 @@ var backup;
     )
     .forEach(entry => console.log(entry));
 
-    // write schedule to csv file
+    // Write schedule to csv file
     const outputData = optimizedSchedule.join('\n');
     fs.writeFileSync('Exam_Schedule.csv', outputData, 'utf-8');
 })();
