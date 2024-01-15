@@ -1,9 +1,9 @@
-# Algorithms Final Project
+# Algorithms Final Project - Exam Scheduler
 
 ## How to Run?
 - You can download the node.js [here](https://nodejs.org/en/download/)
 - Run this command in command line `npm install prompt-sync`
--  Run with `node main.js`
+- Run the program with `node main.js`
 
 ## Group Members:
 - Enes Sapan        : 22050151002
