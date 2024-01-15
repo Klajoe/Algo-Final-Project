@@ -55,7 +55,7 @@ async function assignCoursesToRooms(coursesFilePath, roomsFilePath, courses) {
     let schedule = [];
 
     blockedDayIndex = -1;
-    let flagBlocked
+    let flagBlocked = 0;
 
     // Block a specific hour
     blockHour = prompt('Do you want to block a specific hour? (y/n): ').toLowerCase() === 'y';
